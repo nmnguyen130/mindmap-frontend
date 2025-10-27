@@ -1,17 +1,17 @@
 # Frontend Tasks: Mind Mapping App
 
 ## Current Status
-**Phase**: Unified Expo Setup with Modern Stack
-**Next Milestone**: Cross-Platform Mind Map Editor with Zustand
+**Phase**: Milestone 2: Core Editor (Week 2-3)
+**Next Milestone**: Milestone 3: Enhanced Features (Week 4-5)
 
 ## Active Work
 
 ### High Priority
-- [ ] **Expo SDK 53+ Project Initialization**
-  - [ ] Create new Expo project with TypeScript and Expo Router v4+
-  - [ ] Set up NativeWind v4+ for styling
-  - [ ] Configure Metro bundler for React Native Web 0.19+
-  - [ ] Initialize Zustand stores with middleware
+- [x] **Expo SDK 53+ Project Initialization**
+  - [x] Create new Expo project with TypeScript and Expo Router v4+
+  - [x] Set up NativeWind v4+ for styling
+  - [x] Configure Metro bundler for React Native Web 0.19+
+  - [x] Initialize Zustand stores with middleware
 
 - [ ] **Cross-Platform Foundation**
   - [ ] Install and configure TanStack Query v5+
