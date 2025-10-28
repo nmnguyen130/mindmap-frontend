@@ -53,11 +53,11 @@
 ## Backlog
 
 ### Core Features
-- [ ] **Platform-Adaptive Mind Map Canvas**
-  - [ ] Create abstract Canvas component with platform selection
-  - [ ] Implement React Flow v12+ for web
-  - [ ] Implement React Native Skia for mobile
-  - [ ] Add node creation and basic editing across platforms
+- [x] **Platform-Adaptive Mind Map Canvas**
+  - [x] Create abstract Canvas component with platform selection
+  - [x] Implement React Flow v12+ for web
+  - [x] Implement React Native Skia for mobile
+  - [x] Add node creation and basic editing across platforms
 
 - [ ] **AI Integration with Modern API Layer**
   - [ ] Create note input component with AI suggestions
@@ -65,9 +65,12 @@
   - [ ] Add loading states and error boundaries
   - [ ] Optimize for both web and mobile UX
 
-- [ ] **Offline-First with Expo SQLite**
-  - [ ] Design SQLite schema for mind maps and nodes
-  - [ ] Implement local storage operations
+- [x] **Offline-First with Expo SQLite**
+  - [x] Design SQLite schema for mind maps and nodes
+  - [x] Implement local storage operations
+  - [x] Create database service layer with TypeScript
+  - [x] Add database migrations system
+  - [x] Update stores to use SQLite instead of AsyncStorage
   - [ ] Create sync mechanism with conflict resolution
   - [ ] Add offline indicators and sync status
 

@@ -1,13 +1,15 @@
-import { Platform } from 'react-native'
+import React from 'react'
+import { Platform, View, Text } from 'react-native'
 
 import { MindMapNode } from '@/stores/mindmaps'
 
-import WebCanvas from './web-canvas'
-import MobileCanvas from './mobile-canvas'
+// Lazy load platform-specific canvases for better performance
+const WebCanvas = React.lazy(() => import('./web-canvas'))
+const MobileCanvas = React.lazy(() => import('./mobile-canvas'))
 
 interface CanvasProps {
+  mindMapId: string
   nodes: MindMapNode[]
-  onNodeAdd: (node: Omit<MindMapNode, 'id'>) => void
   onNodeUpdate: (id: string, updates: Partial<MindMapNode>) => void
   onNodeDelete: (id: string) => void
   onConnectionAdd: (from: string, to: string) => void
@@ -15,9 +17,23 @@ interface CanvasProps {
 }
 
 export default function Canvas(props: CanvasProps) {
-  if (Platform.OS === 'web') {
-    return <WebCanvas {...props} />
-  } else {
-    return <MobileCanvas {...props} />
-  }
+  const isWeb = Platform.OS === 'web'
+  const CanvasComponent = isWeb ? WebCanvas : MobileCanvas
+
+  return (
+    <React.Suspense fallback={<CanvasFallback />}>
+      <CanvasComponent {...props} />
+    </React.Suspense>
+  )
+}
+
+function CanvasFallback() {
+  return (
+    <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <View className="items-center">
+        <View className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></View>
+        <Text className="text-gray-600 dark:text-gray-400 text-center">Loading canvas...</Text>
+      </View>
+    </View>
+  )
 }

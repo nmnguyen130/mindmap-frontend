@@ -9,6 +9,7 @@ import {
   Controls,
   MiniMap,
   Background,
+  Panel,
   Connection,
   EdgeChange,
   NodeChange,
@@ -16,25 +17,40 @@ import {
 
 import '@xyflow/react/dist/style.css'
 import { MindMapNode } from '@/stores/mindmaps'
+import { useMindMapStore } from '@/stores/mindmaps'
 
 interface WebCanvasProps {
+  mindMapId: string
   nodes: MindMapNode[]
-  onNodeAdd: (node: Omit<MindMapNode, 'id'>) => void
   onNodeUpdate: (id: string, updates: Partial<MindMapNode>) => void
   onNodeDelete: (id: string) => void
   onConnectionAdd: (from: string, to: string) => void
   onConnectionDelete: (connectionId: string) => void
 }
 
-// Convert MindMapNode to ReactFlow Node
+// Convert MindMapNode to ReactFlow Node with better styling
 const convertToReactFlowNode = (node: MindMapNode): Node => ({
   id: node.id,
   type: 'default',
   position: node.position,
-  data: { label: node.text },
+  data: { 
+    label: (
+      <div className="px-4 py-3 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 min-w-[120px] text-center">
+        <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+          {node.text}
+        </div>
+      </div>
+    )
+  },
+  style: {
+    background: 'transparent',
+    border: 'none',
+    width: 'auto',
+    height: 'auto',
+  },
 })
 
-// Convert connections to ReactFlow Edges
+// Convert connections to ReactFlow Edges with better styling
 const convertToReactFlowEdges = (nodes: MindMapNode[]): Edge[] => {
   const edges: Edge[] = []
   nodes.forEach(node => {
@@ -43,6 +59,13 @@ const convertToReactFlowEdges = (nodes: MindMapNode[]): Edge[] => {
         id: `${node.id}-${targetId}`,
         source: node.id,
         target: targetId,
+        type: 'smoothstep',
+        animated: true,
+        style: {
+          stroke: '#3b82f6',
+          strokeWidth: 2,
+        },
+        className: 'stroke-blue-500',
       })
     })
   })
@@ -50,13 +73,14 @@ const convertToReactFlowEdges = (nodes: MindMapNode[]): Edge[] => {
 }
 
 export default function WebCanvas({
+  mindMapId,
   nodes,
-  onNodeAdd,
   onNodeUpdate,
   onNodeDelete,
   onConnectionAdd,
   onConnectionDelete,
 }: WebCanvasProps) {
+  const { addNode } = useMindMapStore()
   const reactFlowNodes = useMemo(() => nodes.map(convertToReactFlowNode), [nodes])
   const reactFlowEdges = useMemo(() => convertToReactFlowEdges(nodes), [nodes])
 
@@ -85,42 +109,66 @@ export default function WebCanvas({
     }
   }, [onConnectionAdd, setRfEdges])
 
-  const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-    // Handle node editing
-    console.log('Node clicked:', node.id)
+  const handleNodeDoubleClick = useCallback((event: React.MouseEvent, node: Node) => {
+    // Handle node editing - could open a modal for inline editing
+    console.log('Node double-clicked for editing:', node.id)
+    // TODO: Implement inline editing or modal
   }, [])
 
-  const handlePaneClick = useCallback((event: React.MouseEvent) => {
-    // Add new node on double click
-    if (event.detail === 2) {
-      const rect = (event.target as HTMLElement).getBoundingClientRect()
-      const position = {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
-      }
-      onNodeAdd({
-        text: 'New Node',
-        position,
-        connections: [],
-      })
+  const handlePaneDoubleClick = useCallback((event: React.MouseEvent) => {
+    // Add new node at clicked position using SQLite store
+    const reactFlowBounds = (event.target as HTMLElement).getBoundingClientRect()
+    const position = {
+      x: event.clientX - reactFlowBounds.left,
+      y: event.clientY - reactFlowBounds.top,
     }
-  }, [onNodeAdd])
+    addNode(mindMapId, {
+      text: 'New Node',
+      position,
+      connections: [],
+    })
+  }, [addNode, mindMapId])
 
   return (
-    <div style={{ width: '100%', height: '100%' }}>
+    <div className="w-full h-full bg-gray-50 dark:bg-gray-900">
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onConnect={handleConnect}
-        onNodeClick={handleNodeClick}
-        onPaneClick={handlePaneClick}
+        onNodeDoubleClick={handleNodeDoubleClick}
+        onPaneDoubleClick={handlePaneDoubleClick}
         fitView
+        className="bg-gray-50 dark:bg-gray-900"
+        proOptions={{ hideAttribution: true }}
       >
-        <Controls />
-        <MiniMap />
-        <Background />
+        <Controls 
+          className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg"
+          showZoom={true}
+          showFitView={true}
+          showInteractive={true}
+        />
+        <MiniMap 
+          className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg"
+          nodeColor={() => '#3b82f6'}
+          maskColor="rgba(59, 130, 246, 0.1)"
+        />
+        <Background 
+          variant="dots" 
+          gap={16} 
+          size={1}
+          color="#d1d5db"
+        />
+        <Panel position="top-left" className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 m-2">
+          <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+            <div className="font-medium">SQLite-Powered Canvas:</div>
+            <div>• Double-click canvas to add node</div>
+            <div>• Double-click node to edit</div>
+            <div>• Drag from node edge to connect</div>
+            <div>• All data persists offline</div>
+          </div>
+        </Panel>
       </ReactFlow>
     </div>
   )

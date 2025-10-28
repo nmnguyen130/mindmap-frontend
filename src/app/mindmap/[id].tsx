@@ -1,14 +1,43 @@
-import { View, Text } from 'react-native'
-import { useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams } from "expo-router";
+import { useEffect } from "react";
+import { Text, View } from "react-native";
 
-import { useMindMapStore } from '@/stores'
-import Canvas from '@/components/mindmap/canvas/canvas'
+import Canvas from "@/components/mindmap/canvas/canvas";
+import { useMindMapStore } from "@/stores/mindmaps";
 
 export default function MindMapScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>()
-  const { maps } = useMindMapStore()
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { maps, currentMap, loadMap, isLoading, error } = useMindMapStore();
 
-  const map = maps.find(m => m.id === id)
+  useEffect(() => {
+    if (id) {
+      loadMap(id).catch((err) => {
+        console.error("Load map error:", err);
+      });
+    }
+  }, [id, loadMap]);
+
+  const map = currentMap || maps.find((m) => m.id === id);
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 justify-center items-center bg-white dark:bg-black">
+        <Text className="text-lg text-gray-600 dark:text-gray-400">
+          Loading mind map...
+        </Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View className="flex-1 justify-center items-center bg-white dark:bg-black">
+        <Text className="text-lg text-red-600 dark:text-red-400">
+          Error: {error}
+        </Text>
+      </View>
+    );
+  }
 
   if (!map) {
     return (
@@ -17,33 +46,28 @@ export default function MindMapScreen() {
           Mind map not found
         </Text>
       </View>
-    )
-  }
-
-  const handleNodeAdd = (node: Omit<any, 'id'>) => {
-    // TODO: Implement node addition
-    console.log('Add node:', node)
+    );
   }
 
   const handleNodeUpdate = (nodeId: string, updates: any) => {
     // TODO: Implement node update
-    console.log('Update node:', nodeId, updates)
-  }
+    console.log("Update node:", nodeId, updates);
+  };
 
   const handleNodeDelete = (nodeId: string) => {
     // TODO: Implement node deletion
-    console.log('Delete node:', nodeId)
-  }
+    console.log("Delete node:", nodeId);
+  };
 
   const handleConnectionAdd = (from: string, to: string) => {
     // TODO: Implement connection addition
-    console.log('Add connection:', from, to)
-  }
+    console.log("Add connection:", from, to);
+  };
 
   const handleConnectionDelete = (connectionId: string) => {
     // TODO: Implement connection deletion
-    console.log('Delete connection:', connectionId)
-  }
+    console.log("Delete connection:", connectionId);
+  };
 
   return (
     <View className="flex-1">
@@ -53,13 +77,13 @@ export default function MindMapScreen() {
         </Text>
       </View>
       <Canvas
+        mindMapId={map.id}
         nodes={map.nodes}
-        onNodeAdd={handleNodeAdd}
         onNodeUpdate={handleNodeUpdate}
         onNodeDelete={handleNodeDelete}
         onConnectionAdd={handleConnectionAdd}
         onConnectionDelete={handleConnectionDelete}
       />
     </View>
-  )
+  );
 }

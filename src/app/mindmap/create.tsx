@@ -2,19 +2,17 @@ import { View, Text, TextInput, Pressable } from 'react-native'
 import { useState } from 'react'
 import { router } from 'expo-router'
 
-import { useCreateMindMap } from '@/services/mindmap'
-import { useMindMapStore } from '@/stores'
+import { useMindMapStore } from '@/stores/mindmaps'
 
 export default function CreateMindMapScreen() {
   const [title, setTitle] = useState('')
-  const createMap = useCreateMindMap()
-  const { setCurrentMap } = useMindMapStore()
+  const { createMap, setCurrentMap, maps } = useMindMapStore()
 
   const handleCreate = async () => {
     if (!title.trim()) return
 
     try {
-      const newMap = await createMap.mutateAsync({
+      const newMap = await createMap({
         title: title.trim(),
         nodes: []
       })
@@ -41,10 +39,10 @@ export default function CreateMindMapScreen() {
       <Pressable
         className="w-full p-3 bg-blue-500 rounded-lg"
         onPress={handleCreate}
-        disabled={createMap.isPending}
+        disabled={false}
       >
         <Text className="text-white text-center font-semibold">
-          {createMap.isPending ? 'Creating...' : 'Create Mind Map'}
+          Create Mind Map
         </Text>
       </Pressable>
     </View>

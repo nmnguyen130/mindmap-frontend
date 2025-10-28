@@ -2,7 +2,7 @@ import { View, Text, TextInput, Pressable } from 'react-native'
 import { useState } from 'react'
 
 import { useLogin } from '@/services/auth'
-import { useAuthStore } from '@/stores'
+import { useAuthStore } from '@/stores/auth'
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('')

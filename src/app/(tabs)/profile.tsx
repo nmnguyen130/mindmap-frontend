@@ -1,6 +1,6 @@
 import { View, Text, Pressable } from 'react-native'
 
-import { useAuthStore } from '@/stores'
+import { useAuthStore } from '@/stores/auth'
 
 export default function ProfileScreen() {
   const { user, isAuthenticated, logout } = useAuthStore()
