@@ -1,4 +1,4 @@
-import { Path, Skia } from "@shopify/react-native-skia";
+import { Path, Skia, SkPaint } from "@shopify/react-native-skia";
 import React from "react";
 
 interface ConnectionProps {
@@ -14,7 +14,7 @@ interface ConnectionProps {
     position: { x: number; y: number };
     connections: string[];
   };
-  connectionPaint: any;
+  connectionPaint: SkPaint;
 }
 
 export default function Connection({

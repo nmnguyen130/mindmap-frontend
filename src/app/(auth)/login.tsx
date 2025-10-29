@@ -13,7 +13,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     try {
       await login.mutateAsync({ email, password })
-      await loginStore({ email, password })
+      await loginStore(email, password)
     } catch (error) {
       console.error('Login failed:', error)
     }

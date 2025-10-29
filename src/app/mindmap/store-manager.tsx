@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 import { MindMapNode, useMindMapStore } from "@/stores/mindmaps";
-import { safeAsync } from "@/utils/safe-async";
 
 export default function StoreManagerScreen() {
   const { createMap, loadMaps, maps, isLoading, error, deleteMap } =
@@ -67,8 +66,8 @@ export default function StoreManagerScreen() {
 
         // Also test database persistence by reloading after a delay
         setTimeout(() => {
-          const checkPersistence = async () => {
-              await loadMaps();
+          loadMaps()
+            .then(() => {
               // Get the current state from Zustand directly (not from React hook)
               const currentState = useMindMapStore.getState();
               const persistedMap = currentState.maps.find(
@@ -83,8 +82,12 @@ export default function StoreManagerScreen() {
                   addLog(`Map: ${m.nodes.length} nodes`)
                 );
               }
-          };
-          safeAsync(checkPersistence);
+            })
+            .catch((error) => {
+              addLog(
+                `Persistence check error: ${error instanceof Error ? error.message : String(error)}`
+              );
+            });
         }, 1000); // Wait 1 second for database operations to complete
       } else {
         addLog("Creation verification failed");
@@ -138,7 +141,7 @@ export default function StoreManagerScreen() {
       addLog("Update completed");
     } catch (error) {
       addLog(
-        `❌ Error updating mind map: ${error instanceof Error ? error.message : String(error)}`
+        `Error updating mind map: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   };
@@ -238,7 +241,7 @@ export default function StoreManagerScreen() {
         <View className="flex-row justify-between mb-3">
           <TouchableOpacity
             className="bg-blue-600 p-3 rounded-lg flex-1 mr-2"
-            onPress={() => safeAsync(createTestMindMap)}
+            onPress={() => void createTestMindMap()}
             disabled={isLoading}
           >
             <Text className="text-white text-center font-semibold text-sm">
@@ -248,7 +251,7 @@ export default function StoreManagerScreen() {
 
           <TouchableOpacity
             className="bg-green-600 p-3 rounded-lg flex-1 mr-2"
-            onPress={() => safeAsync(updateTestMindMap)}
+            onPress={() => void updateTestMindMap()}
             disabled={isLoading || maps.length === 0}
           >
             <Text className="text-white text-center font-semibold text-sm">
@@ -258,7 +261,7 @@ export default function StoreManagerScreen() {
 
           <TouchableOpacity
             className="bg-indigo-600 p-3 rounded-lg flex-1"
-            onPress={() => safeAsync(handleViewDatabaseData)}
+            onPress={() => void handleViewDatabaseData()}
             disabled={isLoading}
           >
             <Text className="text-white text-center font-semibold text-sm">
@@ -271,7 +274,7 @@ export default function StoreManagerScreen() {
         <View className="flex-row justify-between">
           <TouchableOpacity
             className="bg-red-600 p-3 rounded-lg flex-1 mr-2"
-            onPress={() => safeAsync(handleDeleteMindMap)}
+            onPress={() => void handleDeleteMindMap()}
             disabled={isLoading || maps.length === 0}
           >
             <Text className="text-white text-center font-semibold text-sm">

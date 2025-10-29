@@ -2,10 +2,16 @@ import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 
+export type ModalData =
+  | { type: 'confirm'; title: string; message: string; onConfirm: () => void }
+  | { type: 'input'; title: string; placeholder: string; onSubmit: (value: string) => void }
+  | { type: 'info'; title: string; message: string }
+  | Record<string, unknown>
+
 export interface Modal {
   id: string;
   type: string;
-  data?: any;
+  data?: ModalData;
 }
 
 export interface Notification {

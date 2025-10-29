@@ -1,8 +1,9 @@
 import {
   Circle,
+  matchFont,
   RoundedRect,
-  Skia,
   Text as SkiaText,
+  SkPaint,
 } from "@shopify/react-native-skia";
 import React from "react";
 
@@ -13,9 +14,9 @@ interface NodeProps {
     position: { x: number; y: number };
     connections: string[];
   };
-  nodeFillPaint: any;
-  nodeStrokePaint: any;
-  textPaint: any;
+  nodeFillPaint: SkPaint;
+  nodeStrokePaint: SkPaint;
+  textPaint: SkPaint;
 }
 
 export const NODE_RADIUS = 60;
@@ -27,6 +28,8 @@ export default function Node({
   nodeStrokePaint,
   textPaint,
 }: NodeProps) {
+  const font = matchFont({ fontSize: 14 });
+
   return (
     <React.Fragment key={node.id}>
       {/* Node shadow */}
@@ -71,7 +74,7 @@ export default function Node({
         x={node.position.x}
         y={node.position.y + 5}
         text={node.text}
-        font={Skia.Font(null, 14)}
+        font={font}
         paint={textPaint}
       />
     </React.Fragment>

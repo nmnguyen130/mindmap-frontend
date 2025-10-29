@@ -1,27 +1,27 @@
-import { View, Text, TextInput, Pressable } from 'react-native'
-import { useState } from 'react'
-import { router } from 'expo-router'
+import { router } from "expo-router";
+import { useState } from "react";
+import { Pressable, Text, TextInput, View } from "react-native";
 
-import { useMindMapStore } from '@/stores/mindmaps'
+import { useMindMapStore } from "@/stores/mindmaps";
 
 export default function CreateMindMapScreen() {
-  const [title, setTitle] = useState('')
-  const { createMap, setCurrentMap, maps } = useMindMapStore()
+  const [title, setTitle] = useState("");
+  const { createMap, setCurrentMap, maps } = useMindMapStore();
 
   const handleCreate = async () => {
-    if (!title.trim()) return
+    if (!title.trim()) return;
 
     try {
       const newMap = await createMap({
         title: title.trim(),
-        nodes: []
-      })
-      setCurrentMap(newMap)
-      router.push(`/mindmap/${newMap.id}`)
+        nodes: [],
+      });
+      setCurrentMap(newMap);
+      router.push(`/mindmap/${newMap.id}`);
     } catch (error) {
-      console.error('Create failed:', error)
+      console.error("Create failed:", error);
     }
-  }
+  };
 
   return (
     <View className="flex-1 justify-center items-center p-4 bg-white dark:bg-black">
@@ -38,7 +38,7 @@ export default function CreateMindMapScreen() {
 
       <Pressable
         className="w-full p-3 bg-blue-500 rounded-lg"
-        onPress={handleCreate}
+        onPress={() => void handleCreate()}
         disabled={false}
       >
         <Text className="text-white text-center font-semibold">
@@ -46,5 +46,5 @@ export default function CreateMindMapScreen() {
         </Text>
       </Pressable>
     </View>
-  )
+  );
 }

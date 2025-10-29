@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { Text, View } from "react-native";
 
 import Canvas from "@/components/mindmap/canvas/canvas";
-import { useMindMapStore } from "@/stores/mindmaps";
+import { useMindMapStore, MindMapNode } from "@/stores/mindmaps";
 
 export default function MindMapScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -49,7 +49,7 @@ export default function MindMapScreen() {
     );
   }
 
-  const handleNodeUpdate = (nodeId: string, updates: any) => {
+  const handleNodeUpdate = (nodeId: string, updates: Partial<MindMapNode>) => {
     // TODO: Implement node update
     console.log("Update node:", nodeId, updates);
   };
