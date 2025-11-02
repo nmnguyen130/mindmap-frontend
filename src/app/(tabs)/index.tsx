@@ -19,6 +19,10 @@ export default function HomeScreen() {
     router.push(`/mindmap/${id}`)
   }
 
+  const handleOpenDemoMindMap = () => {
+    router.push('/mindmap/default')
+  }
+
   return (
     <ScrollView className="flex-1 bg-white dark:bg-black">
       <View className="p-6">
@@ -36,6 +40,15 @@ export default function HomeScreen() {
           >
             <Text className="text-white text-center font-semibold text-lg">
               Create New Mind Map
+            </Text>
+          </Pressable>
+          
+          <Pressable
+            onPress={handleOpenDemoMindMap}
+            className="bg-green-500 p-4 rounded-lg mb-4"
+          >
+            <Text className="text-white text-center font-semibold text-lg">
+              View Demo Mind Map
             </Text>
           </Pressable>
           

@@ -1,11 +1,11 @@
 import {
-  Circle,
   matchFont,
   RoundedRect,
-  Text as SkiaText,
   SkPaint,
+  Text,
 } from "@shopify/react-native-skia";
 import React from "react";
+import { Platform } from "react-native";
 
 interface NodeProps {
   node: {
@@ -19,8 +19,10 @@ interface NodeProps {
   textPaint: SkPaint;
 }
 
-export const NODE_RADIUS = 60;
-export const NODE_PADDING = 16;
+const MIN_WIDTH = 80;
+const MIN_HEIGHT = 32;
+const PADDING = 12;
+const FONT_SIZE = 12;
 
 export default function Node({
   node,
@@ -28,51 +30,82 @@ export default function Node({
   nodeStrokePaint,
   textPaint,
 }: NodeProps) {
-  const font = matchFont({ fontSize: 14 });
+  const fontStyle = React.useMemo(
+    () => ({
+      fontFamily: Platform.OS === "ios" ? "Helvetica" : "sans-serif",
+      fontSize: FONT_SIZE,
+    }),
+    []
+  );
+
+  const font = React.useMemo(() => matchFont(fontStyle), [fontStyle]);
+
+  // Calculate text dimensions and node size
+  const nodeDimensions = React.useMemo(() => {
+    if (!node.text) {
+      return {
+        width: MIN_WIDTH,
+        height: MIN_HEIGHT,
+        textWidth: 0,
+        textHeight: FONT_SIZE,
+      };
+    }
+
+    const textMetrics = font.measureText(node.text);
+    const textWidth = textMetrics.width;
+    const textHeight = FONT_SIZE; // Approximate line height
+
+    const nodeWidth = Math.max(MIN_WIDTH, textWidth + PADDING * 2);
+    const nodeHeight = Math.max(MIN_HEIGHT, textHeight + PADDING * 2);
+
+    return {
+      width: nodeWidth,
+      height: nodeHeight,
+      textWidth,
+      textHeight,
+    };
+  }, [font, node.text]);
+
+  const { width: nodeWidth, height: nodeHeight, textWidth, textHeight } = nodeDimensions;
 
   return (
-    <React.Fragment key={node.id}>
+    <React.Fragment>
       {/* Node shadow */}
-      <Circle
-        cx={node.position.x + 2}
-        cy={node.position.y + 2}
-        r={NODE_RADIUS}
+      <RoundedRect
+        x={node.position.x - nodeWidth / 2 + 2}
+        y={node.position.y - nodeHeight / 2 + 2}
+        width={nodeWidth}
+        height={nodeHeight}
+        r={nodeHeight / 2}
         color="#000000"
         opacity={0.1}
       />
 
-      {/* Main node circle */}
-      <Circle
-        cx={node.position.x}
-        cy={node.position.y}
-        r={NODE_RADIUS}
+      {/* Main node */}
+      <RoundedRect
+        x={node.position.x - nodeWidth / 2}
+        y={node.position.y - nodeHeight / 2}
+        width={nodeWidth}
+        height={nodeHeight}
+        r={nodeHeight / 2}
         paint={nodeFillPaint}
       />
 
       {/* Node border */}
-      <Circle
-        cx={node.position.x}
-        cy={node.position.y}
-        r={NODE_RADIUS}
+      <RoundedRect
+        x={node.position.x - nodeWidth / 2}
+        y={node.position.y - nodeHeight / 2}
+        width={nodeWidth}
+        height={nodeHeight}
+        r={nodeHeight / 2}
         paint={nodeStrokePaint}
         style="stroke"
       />
 
-      {/* Node text background for better readability */}
-      <RoundedRect
-        x={node.position.x - NODE_RADIUS + NODE_PADDING}
-        y={node.position.y - 10}
-        width={NODE_RADIUS * 2 - NODE_PADDING * 2}
-        height={20}
-        r={8}
-        color="#ffffff"
-        opacity={0.9}
-      />
-
       {/* Node text */}
-      <SkiaText
-        x={node.position.x}
-        y={node.position.y + 5}
+      <Text
+        x={node.position.x - textWidth / 2}
+        y={node.position.y + textHeight / 2 - 2} // Adjust for baseline
         text={node.text}
         font={font}
         paint={textPaint}

@@ -1,13 +1,13 @@
-import { Canvas, Skia } from "@shopify/react-native-skia";
+import { Canvas, Group, Skia } from "@shopify/react-native-skia";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { scheduleOnRN } from "react-native-worklets";
+import { type SharedValue } from "react-native-reanimated";
 
-import { MindMapNode, useMindMapStore } from "@/stores/mindmaps";
+import { MindMapNode } from "@/stores/mindmaps";
 
+import { CanvasGestureHandler } from "./gesture-handler";
 import Connection from "./connection";
-import Node, { NODE_RADIUS } from "./node";
+import Node from "./node";
 
 interface MobileCanvasProps {
   mindMapId: string;
@@ -23,92 +23,32 @@ export default function MobileCanvas({
   onNodeUpdate,
   onConnectionDelete,
 }: MobileCanvasProps) {
-  const { addNode, addConnection } = useMindMapStore();
-
-  // Worklet function to handle touch events
-  const handleTouch = (x: number, y: number) => {
-    "use worklet";
-    // Schedule the store operation on JS thread to avoid worklet issues
-    scheduleOnRN(() => {
-      // Check if tapping on a node (need to access nodes from JS thread)
-      const tappedNode = nodes.find((node) => {
-        const dx = x - node.position.x;
-        const dy = y - node.position.y;
-        return Math.sqrt(dx * dx + dy * dy) <= NODE_RADIUS;
-      });
-
-      if (tappedNode) {
-        console.log("Node tapped:", tappedNode.id);
-        // TODO: Handle node selection/editing
-      } else {
-        // Add new node using SQLite store
-        addNode(mindMapId, {
-          text: "New Node",
-          position: { x, y },
-          connections: [],
-        });
-      }
-    });
-  };
-
-  // Worklet function to handle double-tap for editing
-  const handleDoubleTap = (x: number, y: number) => {
-    "use worklet";
-    scheduleOnRN(() => {
-      const tappedNode = nodes.find((node) => {
-        const dx = x - node.position.x;
-        const dy = y - node.position.y;
-        return Math.sqrt(dx * dx + dy * dy) <= NODE_RADIUS;
-      });
-
-      if (tappedNode) {
-        console.log("Node double-tapped for editing:", tappedNode.id);
-        // TODO: Implement node editing
-      }
-    });
-  };
-
-  // Create separate tap gestures for single and double tap
-  const singleTap = Gesture.Tap()
-    .maxDuration(250)
-    .onStart((event) => {
-      handleTouch(event.x, event.y);
-    });
-
-  const doubleTap = Gesture.Tap()
-    .maxDuration(250)
-    .numberOfTaps(2)
-    .onStart((event) => {
-      handleDoubleTap(event.x, event.y);
-    });
-
-  // Combine gestures with exclusive handling
-  const tapGesture = Gesture.Exclusive(doubleTap, singleTap);
-
   // Create shared paint objects for better performance
   const nodeFillPaint = React.useMemo(() => {
     const paint = Skia.Paint();
-    paint.setColor(Skia.Color("#3b82f6"));
+    paint.setColor(Skia.Color("#dbeafe"));
     return paint;
   }, []);
 
   const nodeStrokePaint = React.useMemo(() => {
-    const paint = Skia.Paint();
-    paint.setColor(Skia.Color("#1d4ed8"));
-    paint.setStrokeWidth(3);
-    return paint;
-  }, []);
-
-  const connectionPaint = React.useMemo(() => {
     const paint = Skia.Paint();
     paint.setColor(Skia.Color("#60a5fa"));
     paint.setStrokeWidth(2);
     return paint;
   }, []);
 
+  const connectionPaint = React.useMemo(() => {
+    const paint = Skia.Paint();
+    paint.setColor(Skia.Color("#93c5fd"));
+    paint.setStrokeWidth(2);
+    return paint;
+  }, []);
+
   const textPaint = React.useMemo(() => {
     const paint = Skia.Paint();
-    paint.setColor(Skia.Color("#ffffff"));
+    paint.setColor(Skia.Color("#1e40af"));
+    paint.setStyle(0); // Fill style
+    paint.setAntiAlias(true);
     return paint;
   }, []);
 
@@ -146,20 +86,24 @@ export default function MobileCanvas({
 
   return (
     <View style={styles.container}>
-      <GestureDetector gesture={tapGesture}>
-        <Canvas style={styles.canvas}>
-          {/* Draw connections */}
-          {renderConnections()}
+      <CanvasGestureHandler>
+        {(matrix) => (
+          <Canvas style={styles.canvas}>
+            <Group matrix={matrix}>
+              {/* Draw connections */}
+              {renderConnections()}
 
-          {/* Draw nodes */}
-          {renderNodes()}
-        </Canvas>
-      </GestureDetector>
+              {/* Draw nodes */}
+              {renderNodes()}
+            </Group>
+          </Canvas>
+        )}
+      </CanvasGestureHandler>
 
       {/* Instructions overlay */}
       <View style={styles.instructions}>
         <Text style={styles.instructionText}>
-          SQLite-Powered • Tap to add node • Data persists offline
+          SQLite-Powered • Pinch to zoom • Pan to move • Tap to add node • Data persists offline
         </Text>
       </View>
     </View>
