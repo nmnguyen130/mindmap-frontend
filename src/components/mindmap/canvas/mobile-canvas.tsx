@@ -1,7 +1,7 @@
-import { Canvas, Group, Skia } from "@shopify/react-native-skia";
+import { Canvas, Group, Skia, Rect } from "@shopify/react-native-skia";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { type SharedValue } from "react-native-reanimated";
+import Animated, { useAnimatedStyle } from "react-native-reanimated";
 
 import { MindMapNode } from "@/stores/mindmaps";
 
@@ -52,6 +52,18 @@ export default function MobileCanvas({
     return paint;
   }, []);
 
+  const groupBackgroundPaint = React.useMemo(() => {
+    const paint = Skia.Paint();
+    paint.setColor(Skia.Color("rgba(0, 255, 0, 0.1)")); // Light green background to visualize group bounds
+    return paint;
+  }, []);
+
+  const focalPointPaint = React.useMemo(() => {
+    const paint = Skia.Paint();
+    paint.setColor(Skia.Color("rgba(255, 255, 0, 0.8)"));
+    return paint;
+  }, []);
+
   // Render connections
   const renderConnections = () => {
     return nodes.map((node) =>
@@ -87,17 +99,37 @@ export default function MobileCanvas({
   return (
     <View style={styles.container}>
       <CanvasGestureHandler>
-        {(matrix) => (
-          <Canvas style={styles.canvas}>
-            <Group matrix={matrix}>
-              {/* Draw connections */}
-              {renderConnections()}
+        {(matrix, focalPoint) => {
+          const focalStyle = useAnimatedStyle(() => ({
+            transform: [
+              { translateX: focalPoint.value.x - 6 },
+              { translateY: focalPoint.value.y - 6 },
+            ],
+          }));
 
-              {/* Draw nodes */}
-              {renderNodes()}
-            </Group>
-          </Canvas>
-        )}
+          return (
+            <View style={styles.canvasContainer}>
+              <Canvas style={styles.canvas}>
+                <Group matrix={matrix}>
+                  {/* Background rectangle to visualize group bounds */}
+                  <Rect
+                    x={0}
+                    y={0}
+                    width={1000}
+                    height={1000}
+                    paint={groupBackgroundPaint}
+                  />
+                  {/* Draw connections */}
+                  {renderConnections()}
+
+                  {/* Draw nodes */}
+                  {renderNodes()}
+                </Group>
+              </Canvas>
+              <Animated.View pointerEvents="none" style={[styles.focalDot, focalStyle]} />
+            </View>
+          );
+        }}
       </CanvasGestureHandler>
 
       {/* Instructions overlay */}
@@ -115,8 +147,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f9fafb",
   },
+  canvasContainer: {
+    flex: 1,
+  },
   canvas: {
     flex: 1,
+    backgroundColor: "rgba(255, 0, 0, 0.1)", // Light red background to visualize canvas bounds
   },
   instructions: {
     position: "absolute",
@@ -140,5 +176,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#ffffff",
     fontWeight: "600",
+  },
+  focalDot: {
+    position: "absolute",
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "rgba(255, 255, 0, 0.9)",
+    borderWidth: 1,
+    borderColor: "#444",
   },
 });
