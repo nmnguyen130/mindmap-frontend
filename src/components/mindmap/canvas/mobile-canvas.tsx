@@ -1,19 +1,26 @@
-import { Canvas, Group, Skia, Rect } from "@shopify/react-native-skia";
+import { Canvas, Group, Rect, Skia } from "@shopify/react-native-skia";
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, Dimensions } from "react-native";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
 
 import { MindMapNode } from "@/stores/mindmaps";
 
 import { CanvasGestureHandler } from "./gesture-handler";
+import { ViewportCulling } from "./viewport-culling";
 import Connection from "./connection";
 import Node from "./node";
+
+// Flag to enable/disable viewport culling for testing
+// Set to true for performance optimization (only render visible nodes)
+// Set to false to render all nodes (useful for debugging or small datasets)
+const USE_VIEWPORT_CULLING = false;
 
 interface MobileCanvasProps {
   mindMapId: string;
   nodes: MindMapNode[];
   onNodeUpdate: (id: string, updates: Partial<MindMapNode>) => void;
   onNodeDelete: (id: string) => void;
+  onConnectionAdd: (from: string, to: string) => void;
   onConnectionDelete: (connectionId: string) => void;
 }
 
@@ -21,9 +28,9 @@ export default function MobileCanvas({
   mindMapId,
   nodes,
   onNodeUpdate,
+  onConnectionAdd,
   onConnectionDelete,
 }: MobileCanvasProps) {
-  // Create shared paint objects for better performance
   const nodeFillPaint = React.useMemo(() => {
     const paint = Skia.Paint();
     paint.setColor(Skia.Color("#dbeafe"));
@@ -33,6 +40,7 @@ export default function MobileCanvas({
   const nodeStrokePaint = React.useMemo(() => {
     const paint = Skia.Paint();
     paint.setColor(Skia.Color("#60a5fa"));
+    paint.setStyle(1); // Stroke style
     paint.setStrokeWidth(2);
     return paint;
   }, []);
@@ -40,6 +48,7 @@ export default function MobileCanvas({
   const connectionPaint = React.useMemo(() => {
     const paint = Skia.Paint();
     paint.setColor(Skia.Color("#93c5fd"));
+    paint.setStyle(1); // Stroke style
     paint.setStrokeWidth(2);
     return paint;
   }, []);
@@ -52,24 +61,46 @@ export default function MobileCanvas({
     return paint;
   }, []);
 
-  const groupBackgroundPaint = React.useMemo(() => {
+  const marginStrokePaint = React.useMemo(() => {
     const paint = Skia.Paint();
-    paint.setColor(Skia.Color("rgba(0, 255, 0, 0.1)")); // Light green background to visualize group bounds
+    paint.setColor(Skia.Color("rgba(0, 255, 0, 0.8)"));
+    paint.setStyle(1); // Stroke style
+    paint.setStrokeWidth(2);
     return paint;
   }, []);
+  const canvasRef = React.useRef<View>(null);
+  const [canvasBounds, setCanvasBounds] = React.useState({ x: 0, y: 0, width: 400, height: 300 });
 
-  const focalPointPaint = React.useMemo(() => {
-    const paint = Skia.Paint();
-    paint.setColor(Skia.Color("rgba(255, 255, 0, 0.8)"));
-    return paint;
+  // Update canvas bounds when layout changes
+  const onCanvasLayout = React.useCallback(() => {
+    if (canvasRef.current) {
+      canvasRef.current.measure((x, y, width, height, pageX, pageY) => {
+        setCanvasBounds({ x: pageX, y: pageY, width, height });
+      });
+    }
   }, []);
 
-  // Render connections
-  const renderConnections = () => {
-    return nodes.map((node) =>
-      node.connections.map((targetId) => {
+  // Calculate viewport based on actual canvas bounds
+  const testViewportWidth = Math.min(400, canvasBounds.width * 0.8);
+  const testViewportHeight = Math.min(300, canvasBounds.height * 0.6);
+
+  // Center viewport within canvas bounds
+  const viewportOffsetX = canvasBounds.x + (canvasBounds.width - testViewportWidth) / 2;
+  const viewportOffsetY = canvasBounds.y + (canvasBounds.height - testViewportHeight) / 2;
+
+  // Memoized render functions to prevent unnecessary re-renders
+  const renderConnections = React.useCallback((visibleNodesList: MindMapNode[]) => {
+    if (visibleNodesList.length === 0) return null;
+
+    const visibleNodeIds = new Set(visibleNodesList.map(node => node.id));
+
+    return nodes.map((node) => {
+      // Skip if source node is not visible
+      if (!visibleNodeIds.has(node.id)) return null;
+
+      return node.connections.map((targetId) => {
         const targetNode = nodes.find((n) => n.id === targetId);
-        if (!targetNode) return null;
+        if (!targetNode || !visibleNodeIds.has(targetNode.id)) return null;
 
         return (
           <Connection
@@ -79,13 +110,14 @@ export default function MobileCanvas({
             connectionPaint={connectionPaint}
           />
         );
-      })
-    );
-  };
+      });
+    });
+  }, [nodes, connectionPaint]);
 
-  // Render nodes
-  const renderNodes = () => {
-    return nodes.map((node) => (
+  const renderNodes = React.useCallback((visibleNodesList: MindMapNode[]) => {
+    if (visibleNodesList.length === 0) return null;
+
+    return visibleNodesList.map((node) => (
       <Node
         key={node.id}
         node={node}
@@ -94,12 +126,13 @@ export default function MobileCanvas({
         textPaint={textPaint}
       />
     ));
-  };
+  }, [nodeFillPaint, nodeStrokePaint, textPaint]);
 
   return (
     <View style={styles.container}>
       <CanvasGestureHandler>
         {(matrix, focalPoint) => {
+
           const focalStyle = useAnimatedStyle(() => ({
             transform: [
               { translateX: focalPoint.value.x - 6 },
@@ -108,25 +141,63 @@ export default function MobileCanvas({
           }));
 
           return (
-            <View style={styles.canvasContainer}>
+            <View ref={canvasRef} onLayout={onCanvasLayout} style={styles.canvasContainer}>
               <Canvas style={styles.canvas}>
                 <Group matrix={matrix}>
-                  {/* Background rectangle to visualize group bounds */}
-                  <Rect
-                    x={0}
-                    y={0}
-                    width={1000}
-                    height={1000}
-                    paint={groupBackgroundPaint}
-                  />
-                  {/* Draw connections */}
-                  {renderConnections()}
-
-                  {/* Draw nodes */}
-                  {renderNodes()}
+                  {/* Viewport Culling - conditionally render visible nodes only */}
+                  {USE_VIEWPORT_CULLING ? (
+                    <ViewportCulling
+                      matrix={matrix}
+                      nodes={nodes}
+                      viewportWidth={testViewportWidth}
+                      viewportHeight={testViewportHeight}
+                      viewportOffsetX={(canvasBounds.width - testViewportWidth) / 2}
+                      viewportOffsetY={(canvasBounds.height - testViewportHeight) / 2}
+                    >
+                      {(visibleNodesList) => (
+                        <>
+                          {/* Draw connections (only visible ones) */}
+                          {renderConnections(visibleNodesList)}
+                          {/* Draw nodes (only visible ones) */}
+                          {renderNodes(visibleNodesList)}
+                        </>
+                      )}
+                    </ViewportCulling>
+                  ) : (
+                    <>
+                      {/* Draw all connections and nodes without culling */}
+                      {renderConnections(nodes)}
+                      {renderNodes(nodes)}
+                    </>
+                  )}
                 </Group>
+
+                {/* Viewport overlays - only show when culling is enabled */}
+                {USE_VIEWPORT_CULLING && (
+                  <>
+                    {/* World viewport indicator (centered within canvas) */}
+                    <Rect
+                      x={(canvasBounds.width - testViewportWidth) / 2}
+                      y={(canvasBounds.height - testViewportHeight) / 2}
+                      width={testViewportWidth}
+                      height={testViewportHeight}
+                      color="rgba(255, 0, 0, 0.2)"
+                    />
+
+                    {/* World viewport with margin (larger area) */}
+                    <Rect
+                      x={Math.max(0, (canvasBounds.width - testViewportWidth) / 2 - 50)}
+                      y={Math.max(0, (canvasBounds.height - testViewportHeight) / 2 - 50)}
+                      width={Math.min(canvasBounds.width, testViewportWidth + 100)}
+                      height={Math.min(canvasBounds.height, testViewportHeight + 100)}
+                      paint={marginStrokePaint}
+                    />
+                  </>
+                )}
               </Canvas>
-              <Animated.View pointerEvents="none" style={[styles.focalDot, focalStyle]} />
+              {USE_VIEWPORT_CULLING && (
+                <Animated.View pointerEvents="none" style={[styles.focalDot, focalStyle]} />
+              )}
             </View>
           );
         }}
@@ -135,7 +206,10 @@ export default function MobileCanvas({
       {/* Instructions overlay */}
       <View style={styles.instructions}>
         <Text style={styles.instructionText}>
-          SQLite-Powered • Pinch to zoom • Pan to move • Tap to add node • Data persists offline
+          {USE_VIEWPORT_CULLING
+            ? "Red = strict viewport • Green = margin area • Pan/zoom to see culling"
+            : "Viewport Culling Disabled • All nodes rendered • Toggle USE_VIEWPORT_CULLING to enable"
+          }
         </Text>
       </View>
     </View>
@@ -152,7 +226,6 @@ const styles = StyleSheet.create({
   },
   canvas: {
     flex: 1,
-    backgroundColor: "rgba(255, 0, 0, 0.1)", // Light red background to visualize canvas bounds
   },
   instructions: {
     position: "absolute",
@@ -164,10 +237,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 5,
