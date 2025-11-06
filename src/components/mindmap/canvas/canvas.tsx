@@ -8,26 +8,32 @@ const WebCanvas = React.lazy(() => import("./web-canvas"));
 const MobileCanvas = React.lazy(() => import("./mobile-canvas"));
 
 interface CanvasProps {
-  mindMapId: string;
   nodes: MindMapNode[];
-  onNodeUpdate: (id: string, updates: Partial<MindMapNode>) => void;
-  onNodeDelete: (id: string) => void;
-  onConnectionAdd: (from: string, to: string) => void;
-  onConnectionDelete: (connectionId: string) => void;
 }
 
-export default function Canvas(props: CanvasProps) {
+const Canvas = ({ nodes }: CanvasProps) => {
+  // Show empty state if no nodes
+  if (!nodes || nodes.length === 0) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <Text className="text-gray-600 dark:text-gray-400 text-center">
+          No mind map data available
+        </Text>
+      </View>
+    );
+  }
+
   const isWeb = Platform.OS === "web";
   const CanvasComponent = isWeb ? WebCanvas : MobileCanvas;
 
   return (
     <React.Suspense fallback={<CanvasFallback />}>
-      <CanvasComponent {...props} />
+      <CanvasComponent nodes={nodes} />
     </React.Suspense>
   );
-}
+};
 
-function CanvasFallback() {
+const CanvasFallback = () => {
   return (
     <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-gray-900">
       <View className="items-center">
@@ -38,4 +44,6 @@ function CanvasFallback() {
       </View>
     </View>
   );
-}
+};
+
+export default Canvas;

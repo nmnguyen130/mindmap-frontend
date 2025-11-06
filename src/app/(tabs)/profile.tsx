@@ -2,7 +2,7 @@ import { View, Text, Pressable } from 'react-native'
 
 import { useAuthStore } from '@/stores/auth'
 
-export default function ProfileScreen() {
+const ProfileScreen = () => {
   const { user, isAuthenticated, logout } = useAuthStore()
 
   const handleLogout = () => {
@@ -40,3 +40,5 @@ export default function ProfileScreen() {
     </View>
   )
 }
+
+export default ProfileScreen;

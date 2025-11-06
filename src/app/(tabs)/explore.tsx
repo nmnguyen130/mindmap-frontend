@@ -1,6 +1,6 @@
 import { View, Text } from 'react-native'
 
-export default function ExploreScreen() {
+const ExploreScreen = () => {
   return (
     <View className="flex-1 justify-center items-center bg-white dark:bg-black">
       <Text className="text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -12,3 +12,5 @@ export default function ExploreScreen() {
     </View>
   )
 }
+
+export default ExploreScreen;

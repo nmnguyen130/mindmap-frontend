@@ -3,9 +3,8 @@ import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 import { MindMapNode, useMindMapStore } from "@/stores/mindmaps";
 
-export default function StoreManagerScreen() {
-  const { createMap, loadMaps, maps, isLoading, error, deleteMap } =
-    useMindMapStore();
+const StoreManagerScreen = () => {
+  const { createMap, loadMaps, maps, isLoading, error, deleteMap } = useMindMapStore();
   const [testResults, setTestResults] = useState<string[]>([]);
 
   const addLog = (message: string) => {
@@ -135,6 +134,7 @@ export default function StoreManagerScreen() {
 
       const { updateMap } = useMindMapStore.getState();
       await updateMap(mapToUpdate.id, {
+        ...mapToUpdate,
         nodes: updatedNodes,
       });
 
@@ -316,4 +316,6 @@ export default function StoreManagerScreen() {
       </ScrollView>
     </View>
   );
-}
+};
+
+export default StoreManagerScreen;

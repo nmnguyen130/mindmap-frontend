@@ -17,18 +17,22 @@ interface ConnectionProps {
   connectionPaint: SkPaint;
 }
 
-export default function Connection({
+const Connection = React.memo(({
   fromNode,
   toNode,
   connectionPaint,
-}: ConnectionProps) {
-  const path = Skia.Path.Make();
-  path.moveTo(fromNode.position.x, fromNode.position.y);
+}: ConnectionProps) => {
+  const path = React.useMemo(() => {
+    const newPath = Skia.Path.Make();
+    newPath.moveTo(fromNode.position.x, fromNode.position.y);
 
-  // Create curved path for better visual appeal
-  const midX = (fromNode.position.x + toNode.position.x) / 2;
-  const midY = (fromNode.position.y + toNode.position.y) / 2;
-  path.quadTo(midX, midY - 50, toNode.position.x, toNode.position.y);
+    // Create curved path for better visual appeal
+    const midX = (fromNode.position.x + toNode.position.x) / 2;
+    const midY = (fromNode.position.y + toNode.position.y) / 2;
+    newPath.quadTo(midX, midY - 50, toNode.position.x, toNode.position.y);
+
+    return newPath;
+  }, [fromNode.position, toNode.position]);
 
   return (
     <Path
@@ -38,4 +42,6 @@ export default function Connection({
       style="stroke"
     />
   );
-}
+});
+
+export default Connection;

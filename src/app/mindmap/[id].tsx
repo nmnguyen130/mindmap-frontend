@@ -4,9 +4,9 @@ import { Text, View } from "react-native";
 
 import Canvas from "@/components/mindmap/canvas/canvas";
 import { defaultMindMap } from "@/data/default-mindmap";
-import { MindMapNode, useMindMapStore } from "@/stores/mindmaps";
+import { useMindMapStore } from "@/stores/mindmaps";
 
-export default function MindMapScreen() {
+const MindMapScreen = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { maps, currentMap, loadMap, isLoading, error } = useMindMapStore();
 
@@ -48,7 +48,7 @@ export default function MindMapScreen() {
     );
   }
 
-  if (!map && id !== "default") {
+  if (!map) {
     return (
       <View className="flex-1 justify-center items-center bg-white dark:bg-black">
         <Text className="text-lg text-gray-600 dark:text-gray-400">
@@ -57,46 +57,6 @@ export default function MindMapScreen() {
       </View>
     );
   }
-
-  const handleNodeUpdate = (nodeId: string, updates: Partial<MindMapNode>) => {
-    // For default demo map, don't allow updates
-    if (id === "default") {
-      console.log("Demo mode - updates disabled");
-      return;
-    }
-    // TODO: Implement node update for user maps
-    console.log("Update node:", nodeId, updates);
-  };
-
-  const handleNodeDelete = (nodeId: string) => {
-    // For default demo map, don't allow deletions
-    if (id === "default") {
-      console.log("Demo mode - deletions disabled");
-      return;
-    }
-    // TODO: Implement node deletion for user maps
-    console.log("Delete node:", nodeId);
-  };
-
-  const handleConnectionAdd = (from: string, to: string) => {
-    // For default demo map, don't allow additions
-    if (id === "default") {
-      console.log("Demo mode - additions disabled");
-      return;
-    }
-    // TODO: Implement connection addition for user maps
-    console.log("Add connection:", from, to);
-  };
-
-  const handleConnectionDelete = (connectionId: string) => {
-    // For default demo map, don't allow deletions
-    if (id === "default") {
-      console.log("Demo mode - deletions disabled");
-      return;
-    }
-    // TODO: Implement connection deletion for user maps
-    console.log("Delete connection:", connectionId);
-  };
 
   return (
     <View className="flex-1">
@@ -110,14 +70,9 @@ export default function MindMapScreen() {
           </Text>
         )}
       </View>
-      <Canvas
-        mindMapId={map.id}
-        nodes={map.nodes}
-        onNodeUpdate={handleNodeUpdate}
-        onNodeDelete={handleNodeDelete}
-        onConnectionAdd={handleConnectionAdd}
-        onConnectionDelete={handleConnectionDelete}
-      />
+      <Canvas nodes={map.nodes} />
     </View>
   );
-}
+};
+
+export default MindMapScreen;

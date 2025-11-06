@@ -26,15 +26,15 @@ const mindmapAPI = {
   },
 };
 
-export const useMindMaps = () => {
+export function useMindMaps() {
   return useQuery({
     queryKey: ["mindmaps"],
     queryFn: mindmapAPI.getUserMaps,
     staleTime: 1000 * 60 * 2, // 2 minutes
   });
-};
+}
 
-export const useCreateMindMap = () => {
+export function useCreateMindMap() {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -51,4 +51,4 @@ export const useCreateMindMap = () => {
       void queryClient.invalidateQueries({ queryKey: ["mindmaps"] });
     },
   });
-};
+}

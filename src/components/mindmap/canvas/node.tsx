@@ -13,6 +13,12 @@ interface NodeProps {
     text: string;
     position: { x: number; y: number };
     connections: string[];
+    box?: {
+      top: number;
+      bottom: number;
+      left: number;
+      right: number;
+    };
   };
   nodeFillPaint: SkPaint;
   nodeStrokePaint: SkPaint;
@@ -24,19 +30,16 @@ const MIN_HEIGHT = 32;
 const PADDING = 12;
 const FONT_SIZE = 12;
 
-export default function Node({
+const Node = React.memo(({
   node,
   nodeFillPaint,
   nodeStrokePaint,
   textPaint,
-}: NodeProps) {
-  const fontStyle = React.useMemo(
-    () => ({
-      fontFamily: Platform.OS === "ios" ? "Helvetica" : "sans-serif",
-      fontSize: FONT_SIZE,
-    }),
-    []
-  );
+}: NodeProps) => {
+  const fontStyle = {
+    fontFamily: Platform.OS === "ios" ? "Helvetica" : "sans-serif",
+    fontSize: FONT_SIZE,
+  };
 
   const font = React.useMemo(() => matchFont(fontStyle), [fontStyle]);
 
@@ -112,4 +115,6 @@ export default function Node({
       />
     </React.Fragment>
   );
-}
+});
+
+export default Node;

@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-export default function MindMapLayout() {
+const MindMapLayout = () => {
   return (
     <SafeAreaView style={{ flex: 1 }} edges={['bottom', 'left', 'right']}>
       <Stack screenOptions={{ headerShown: true }}>
@@ -12,3 +12,5 @@ export default function MindMapLayout() {
     </SafeAreaView>
   )
 }
+
+export default MindMapLayout;

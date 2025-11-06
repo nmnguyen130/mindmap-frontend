@@ -19,7 +19,7 @@ const authAPI = {
   }
 }
 
-export const useLogin = () => {
+export function useLogin() {
   return useMutation({
     mutationFn: authAPI.login,
     onSuccess: (data) => {
@@ -29,7 +29,7 @@ export const useLogin = () => {
   })
 }
 
-export const useLogout = () => {
+export function useLogout() {
   return useMutation({
     mutationFn: authAPI.logout,
     onSuccess: () => {

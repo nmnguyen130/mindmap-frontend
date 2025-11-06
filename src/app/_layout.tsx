@@ -15,7 +15,7 @@ import { databaseService } from "@/services/database";
 // Initialize database on app start
 databaseService.initialize().catch(console.error);
 
-export default function RootLayout() {
+const RootLayout = () => {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>
@@ -30,4 +30,6 @@ export default function RootLayout() {
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
-}
+};
+
+export default RootLayout;

@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 
 import { useMindMapStore } from '@/stores/mindmaps'
 
-export default function HomeScreen() {
+const HomeScreen = () => {
   const { maps, loadMaps, isLoading, error } = useMindMapStore()
 
   useEffect(() => {
@@ -42,7 +42,7 @@ export default function HomeScreen() {
               Create New Mind Map
             </Text>
           </Pressable>
-          
+
           <Pressable
             onPress={handleOpenDemoMindMap}
             className="bg-green-500 p-4 rounded-lg mb-4"
@@ -51,7 +51,7 @@ export default function HomeScreen() {
               View Demo Mind Map
             </Text>
           </Pressable>
-          
+
           <Pressable
             onPress={() => router.push('/mindmap/store-manager')}
             className="bg-orange-500 p-3 rounded-lg mb-4"
@@ -60,7 +60,7 @@ export default function HomeScreen() {
               Store Manager
             </Text>
           </Pressable>
-          
+
           <Link href="/login" className="text-blue-500 text-center underline">
             Login
           </Link>
@@ -84,7 +84,7 @@ export default function HomeScreen() {
           <Text className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3">
             Your Mind Maps ({maps.length})
           </Text>
-          
+
           {maps.length === 0 && !isLoading && (
             <View className="bg-gray-100 dark:bg-gray-800 p-6 rounded-lg items-center">
               <Text className="text-gray-600 dark:text-gray-400 text-center">
@@ -112,3 +112,5 @@ export default function HomeScreen() {
     </ScrollView>
   )
 }
+
+export default HomeScreen;

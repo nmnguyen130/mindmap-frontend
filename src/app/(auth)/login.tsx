@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useLogin } from '@/services/auth'
 import { useAuthStore } from '@/stores/auth'
 
-export default function LoginScreen() {
+const LoginScreen = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const login = useLogin()
@@ -54,3 +54,5 @@ export default function LoginScreen() {
     </View>
   )
 }
+
+export default LoginScreen;

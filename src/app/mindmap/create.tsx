@@ -4,7 +4,7 @@ import { Pressable, Text, TextInput, View } from "react-native";
 
 import { useMindMapStore } from "@/stores/mindmaps";
 
-export default function CreateMindMapScreen() {
+const CreateMindMapScreen = () => {
   const [title, setTitle] = useState("");
   const { createMap, setCurrentMap, maps } = useMindMapStore();
 
@@ -47,4 +47,6 @@ export default function CreateMindMapScreen() {
       </Pressable>
     </View>
   );
-}
+};
+
+export default CreateMindMapScreen;

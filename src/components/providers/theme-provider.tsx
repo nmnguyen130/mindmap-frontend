@@ -108,10 +108,10 @@ interface ThemeProviderProps {
   defaultTheme?: Theme;
 }
 
-export function ThemeProvider({
+export const ThemeProvider = ({
   children,
   defaultTheme = "system",
-}: ThemeProviderProps) {
+}: ThemeProviderProps) => {
   const deviceTheme = useColorScheme();
   const [theme, setThemeState] = useState<Theme>(defaultTheme);
 
@@ -135,4 +135,4 @@ export function ThemeProvider({
   return (
     <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
   );
-}
+};

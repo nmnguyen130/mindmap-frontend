@@ -14,7 +14,7 @@ interface ViewportCullingProps {
   children: (visibleNodes: MindMapNode[]) => React.ReactNode;
 }
 
-export function ViewportCulling({
+const ViewportCulling = ({
   matrix,
   nodes,
   viewportWidth,
@@ -22,7 +22,7 @@ export function ViewportCulling({
   viewportOffsetX = 0,
   viewportOffsetY = 0,
   children,
-}: ViewportCullingProps) {
+}: ViewportCullingProps) => {
   // React state for visible nodes
   const [visibleNodesState, setVisibleNodesState] = React.useState<MindMapNode[]>(nodes);
 
@@ -89,4 +89,6 @@ export function ViewportCulling({
   );
 
   return <>{children(visibleNodesState)}</>;
-}
+};
+
+export default ViewportCulling;
