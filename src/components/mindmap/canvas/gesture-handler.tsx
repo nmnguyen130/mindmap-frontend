@@ -7,16 +7,19 @@ import {
   useDerivedValue,
   useSharedValue,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 
 interface CanvasGestureHandlerProps {
   children: (
     matrix: SharedValue<Matrix4>,
     focalPoint: SharedValue<{ x: number; y: number }>
   ) => React.ReactNode;
+  onSingleTap?: (x: number, y: number) => void;
 }
 
-export const CanvasGestureHandler = ({
+const GestureHandler = ({
   children,
+  onSingleTap,
 }: CanvasGestureHandlerProps) => {
   const currentPosition = useSharedValue({ x: 0, y: 0 });
   const lastPosition = useSharedValue({ x: 0, y: 0 });
@@ -80,7 +83,22 @@ export const CanvasGestureHandler = ({
       lastPosition.value = currentPosition.value;
     });
 
-  const gesture = Gesture.Simultaneous(panGesture, pinchGesture);
+  const tapGesture = Gesture.Tap()
+    .maxDelay(200)
+    .onEnd((e) => {
+      "worklet";
+
+      const screenX = e.x;
+      const screenY = e.y;
+      const worldX = (screenX - currentPosition.value.x) / currentScale.value;
+      const worldY = (screenY - currentPosition.value.y) / currentScale.value;
+
+      if (onSingleTap) {
+        scheduleOnRN(onSingleTap, worldX, worldY);
+      }
+    });
+
+  const gesture = Gesture.Simultaneous(panGesture, pinchGesture, tapGesture);
 
   // Create Skia matrix for canvas transformation with focal pivot
   const canvasMatrix = useDerivedValue(() => {
@@ -98,3 +116,5 @@ export const CanvasGestureHandler = ({
     </GestureDetector>
   );
 };
+
+export default GestureHandler;

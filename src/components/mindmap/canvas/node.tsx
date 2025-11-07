@@ -13,12 +13,6 @@ interface NodeProps {
     text: string;
     position: { x: number; y: number };
     connections: string[];
-    box?: {
-      top: number;
-      bottom: number;
-      left: number;
-      right: number;
-    };
   };
   nodeFillPaint: SkPaint;
   nodeStrokePaint: SkPaint;
