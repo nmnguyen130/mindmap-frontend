@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
+
 import { MindMapNode } from '@/stores/mindmaps';
 import { getNodeBox } from '@/utils/node-utils';
 

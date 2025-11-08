@@ -24,19 +24,17 @@ const MIN_HEIGHT = 32;
 const PADDING = 12;
 const FONT_SIZE = 12;
 
-const Node = React.memo(({
+const font = matchFont({
+  fontFamily: Platform.OS === "ios" ? "Helvetica" : "sans-serif",
+  fontSize: FONT_SIZE,
+});
+
+const NodeComponent = ({
   node,
   nodeFillPaint,
   nodeStrokePaint,
   textPaint,
 }: NodeProps) => {
-  const fontStyle = {
-    fontFamily: Platform.OS === "ios" ? "Helvetica" : "sans-serif",
-    fontSize: FONT_SIZE,
-  };
-
-  const font = React.useMemo(() => matchFont(fontStyle), [fontStyle]);
-
   // Calculate text dimensions and node size
   const nodeDimensions = React.useMemo(() => {
     if (!node.text) {
@@ -61,9 +59,14 @@ const Node = React.memo(({
       textWidth,
       textHeight,
     };
-  }, [font, node.text]);
+  }, [node.text]);
 
-  const { width: nodeWidth, height: nodeHeight, textWidth, textHeight } = nodeDimensions;
+  const {
+    width: nodeWidth,
+    height: nodeHeight,
+    textWidth,
+    textHeight,
+  } = nodeDimensions;
 
   return (
     <React.Fragment>
@@ -109,6 +112,8 @@ const Node = React.memo(({
       />
     </React.Fragment>
   );
-});
+};
+
+const Node = React.memo(NodeComponent);
 
 export default Node;

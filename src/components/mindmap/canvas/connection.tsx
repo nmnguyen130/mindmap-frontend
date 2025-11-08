@@ -17,7 +17,7 @@ interface ConnectionProps {
   connectionPaint: SkPaint;
 }
 
-const Connection = React.memo(({
+const ConnectionComponent = ({
   fromNode,
   toNode,
   connectionPaint,
@@ -42,6 +42,8 @@ const Connection = React.memo(({
       style="stroke"
     />
   );
-});
+};
+
+const Connection = React.memo(ConnectionComponent);
 
 export default Connection;

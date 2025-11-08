@@ -15,11 +15,15 @@ interface CanvasGestureHandlerProps {
     focalPoint: SharedValue<{ x: number; y: number }>
   ) => React.ReactNode;
   onSingleTap?: (x: number, y: number) => void;
+  onInteractionStart?: () => void;
+  onInteractionEnd?: () => void;
 }
 
 const GestureHandler = ({
   children,
   onSingleTap,
+  onInteractionStart,
+  onInteractionEnd,
 }: CanvasGestureHandlerProps) => {
   const currentPosition = useSharedValue({ x: 0, y: 0 });
   const lastPosition = useSharedValue({ x: 0, y: 0 });
@@ -31,6 +35,12 @@ const GestureHandler = ({
   const isPinching = useSharedValue(false);
 
   const panGesture = Gesture.Pan()
+    .onStart(() => {
+      "worklet";
+      if (onInteractionStart) {
+        scheduleOnRN(onInteractionStart);
+      }
+    })
     .onUpdate((e) => {
       "worklet";
       if (isPinching.value) return;
@@ -43,6 +53,9 @@ const GestureHandler = ({
       "worklet";
       if (isPinching.value) return;
       lastPosition.value = currentPosition.value;
+      if (onInteractionEnd) {
+        scheduleOnRN(onInteractionEnd);
+      }
     });
 
   const pinchGesture = Gesture.Pinch()
@@ -54,6 +67,9 @@ const GestureHandler = ({
       lastScale.value = currentScale.value;
       // Sync lastPosition to current at start (fix baseline mismatch)
       lastPosition.value = currentPosition.value;
+      if (onInteractionStart) {
+        scheduleOnRN(onInteractionStart);
+      }
     })
     .onUpdate((e) => {
       "worklet";
@@ -81,6 +97,9 @@ const GestureHandler = ({
       isPinching.value = false;
       // Sync lastPosition for next pan (prevents jump if pan continues/resumes)
       lastPosition.value = currentPosition.value;
+      if (onInteractionEnd) {
+        scheduleOnRN(onInteractionEnd);
+      }
     });
 
   const tapGesture = Gesture.Tap()

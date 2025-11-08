@@ -1,21 +1,27 @@
 import { Canvas, Group, Skia } from "@shopify/react-native-skia";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
 
 import { MindMapNode } from "@/stores/mindmaps";
 import { getNodeBox } from "@/utils/node-utils";
+import { useFPSDetection } from "@/hooks/use-fps-detection";
 
-import GestureHandler from "./gesture-handler";
-import CanvasActionButtons from "./canvas-action-buttons";
+import CanvasActionButtons from "../ui/canvas-action-buttons";
+import NodeSelectionPanel from "../ui/node-selection-panel";
+import FPSOverlay from "../ui/fps-overlay";
+
 import Connection from "./connection";
+import GestureHandler from "./gesture-handler";
 import Node from "./node";
-import NodeSelectionPanel from "./node-selection-panel";
 
 interface MobileCanvasProps {
   nodes: MindMapNode[];
 }
 
 const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
+  // FPS detection hook
+  const { isInteracting, fpsMetrics, startInteraction, stopInteraction } = useFPSDetection();
+
   // Simple state for selected node
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
@@ -23,43 +29,27 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
     ? nodes.find((node) => node.id === selectedNodeId) || null
     : null;
 
-  const nodeFillPaint = React.useMemo(() => {
-    const paint = Skia.Paint();
-    paint.setColor(Skia.Color("#dbeafe"));
-    return paint;
+  const paints = useMemo(() => {
+    const createPaint = (color: string, style = 0, strokeWidth = 1) => {
+      const paint = Skia.Paint();
+      paint.setColor(Skia.Color(color));
+      paint.setStyle(style); // 0 = fill, 1 = stroke
+      paint.setStrokeWidth(strokeWidth);
+      paint.setAntiAlias(true);
+      return paint;
+    };
+
+    return {
+      nodeFill: createPaint("#dbeafe"),
+      nodeStroke: createPaint("#60a5fa", 1, 2),
+      selectedNodeStroke: createPaint("#ef4444", 1, 3),
+      connection: createPaint("#93c5fd", 1, 2),
+      text: createPaint("#1e40af"),
+    };
   }, []);
 
-  const nodeStrokePaint = React.useMemo(() => {
-    const paint = Skia.Paint();
-    paint.setColor(Skia.Color("#60a5fa"));
-    paint.setStyle(1); // Stroke style
-    paint.setStrokeWidth(2);
-    return paint;
-  }, []);
-
-  const connectionPaint = React.useMemo(() => {
-    const paint = Skia.Paint();
-    paint.setColor(Skia.Color("#93c5fd"));
-    paint.setStyle(1); // Stroke style
-    paint.setStrokeWidth(2);
-    return paint;
-  }, []);
-
-  const textPaint = React.useMemo(() => {
-    const paint = Skia.Paint();
-    paint.setColor(Skia.Color("#1e40af"));
-    paint.setStyle(0); // Fill style
-    paint.setAntiAlias(true);
-    return paint;
-  }, []);
-
-  const selectedNodeStrokePaint = React.useMemo(() => {
-    const paint = Skia.Paint();
-    paint.setColor(Skia.Color("#ef4444")); // Red for selection
-    paint.setStyle(1); // Stroke style
-    paint.setStrokeWidth(3);
-    return paint;
-  }, []);
+  // Fast lookup map for nodes
+  const nodeMap = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
 
   // Find node at touch point using bounding box
   const findNodeAtPoint = useCallback(
@@ -80,6 +70,18 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
     [nodes]
   );
 
+  // Handle node tap
+  const handleNodeTap = useCallback(
+    (worldX: number, worldY: number) => {
+      const node = findNodeAtPoint({ x: worldX, y: worldY });
+      const newSelected = node?.id ?? null;
+      if (newSelected !== selectedNodeId) {
+        setSelectedNodeId(newSelected);
+      }
+    },
+    [findNodeAtPoint, selectedNodeId]
+  );
+
   // Deselect node
   const deselectNode = useCallback(() => {
     if (selectedNodeId) {
@@ -87,86 +89,54 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
     }
   }, [selectedNodeId]);
 
-  // Handle node tap
-  const handleNodeTap = useCallback(
-    (worldX: number, worldY: number) => {
-      const touchedNode = findNodeAtPoint({ x: worldX, y: worldY });
-      const newSelectedNodeId = touchedNode?.id || null;
-
-      if (newSelectedNodeId !== selectedNodeId) {
-        setSelectedNodeId(newSelectedNodeId);
-      }
-    },
-    [findNodeAtPoint, selectedNodeId]
-  );
-
   // Render connections
-  const renderConnections = React.useMemo(() => {
+  const renderConnections = useMemo(() => {
     if (!nodes.length) return null;
 
-    // Create node lookup map for O(1) access
-    const nodeMap = new Map(nodes.map((node) => [node.id, node]));
-
-    // Pre-allocate array with estimated capacity
-    const allConnections: {
-      fromNode: MindMapNode;
-      toNode: MindMapNode;
-      key: string;
-    }[] = [];
-
+    const conns: React.ReactNode[] = [];
     for (const node of nodes) {
       for (const targetId of node.connections) {
-        const targetNode = nodeMap.get(targetId);
-        if (targetNode) {
-          allConnections.push({
-            fromNode: node,
-            toNode: targetNode,
-            key: `${node.id}-${targetId}`,
-          });
+        const target = nodeMap.get(targetId);
+        if (target) {
+          conns.push(
+            <Connection
+              key={`${node.id}-${targetId}`}
+              fromNode={node}
+              toNode={target}
+              connectionPaint={paints.connection}
+            />
+          );
         }
       }
     }
-
-    return allConnections.map(({ fromNode, toNode, key }) => (
-      <Connection
-        key={key}
-        fromNode={fromNode}
-        toNode={toNode}
-        connectionPaint={connectionPaint}
-      />
-    ));
-  }, [nodes, connectionPaint]);
+    return conns;
+  }, [nodes, nodeMap, paints.connection]);
 
   // Render nodes
-  const renderNodes = React.useMemo(() => {
-    return nodes.map((node) => {
-      const isSelected = selectedNodeId === node.id;
-      const strokePaint = isSelected
-        ? selectedNodeStrokePaint
-        : nodeStrokePaint;
-
-      return (
-        <Node
-          key={node.id}
-          node={node}
-          nodeFillPaint={nodeFillPaint}
-          nodeStrokePaint={strokePaint}
-          textPaint={textPaint}
-        />
-      );
-    });
-  }, [
-    nodes,
-    selectedNodeId,
-    nodeFillPaint,
-    nodeStrokePaint,
-    selectedNodeStrokePaint,
-    textPaint,
-  ]);
+  const renderNodes = useMemo(
+    () =>
+      nodes.map((node) => {
+        const isSelected = selectedNodeId === node.id;
+        return (
+          <Node
+            key={node.id}
+            node={node}
+            nodeFillPaint={paints.nodeFill}
+            nodeStrokePaint={isSelected ? paints.selectedNodeStroke : paints.nodeStroke}
+            textPaint={paints.text}
+          />
+        );
+      }),
+    [nodes, selectedNodeId, paints]
+  );
 
   return (
     <View className="flex-1 bg-gray-50">
-      <GestureHandler onSingleTap={handleNodeTap}>
+      <GestureHandler 
+        onSingleTap={handleNodeTap}
+        onInteractionStart={startInteraction}
+        onInteractionEnd={stopInteraction}
+      >
         {(matrix, focalPoint) => {
           return (
             <Canvas style={{ flex: 1 }}>
@@ -177,9 +147,13 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
                 {renderNodes}
               </Group>
             </Canvas>
-          )
+          );
         }}
       </GestureHandler>
+      
+      {/* FPS Overlay */}
+      <FPSOverlay isVisible={isInteracting} metrics={fpsMetrics} />
+      
       {/* Selection Panel */}
       <NodeSelectionPanel selectedNode={selectedNode} />
 
@@ -188,7 +162,6 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
         selectedNode={selectedNode}
         onDeselect={deselectNode}
       />
-      
     </View>
   );
 };

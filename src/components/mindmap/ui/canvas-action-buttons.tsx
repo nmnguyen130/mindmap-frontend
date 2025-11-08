@@ -1,8 +1,10 @@
 import React from 'react';
 import { View, TouchableOpacity, Text } from 'react-native';
 
+import { MindMapNode } from '@/stores/mindmaps';
+
 interface CanvasActionButtonsProps {
-  selectedNode: any;
+  selectedNode: MindMapNode | null;
   onDeselect: () => void;
 }
 
