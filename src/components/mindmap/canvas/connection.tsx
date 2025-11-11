@@ -17,11 +17,7 @@ interface ConnectionProps {
   connectionPaint: SkPaint;
 }
 
-const ConnectionComponent = ({
-  fromNode,
-  toNode,
-  connectionPaint,
-}: ConnectionProps) => {
+const Connection = ({ fromNode, toNode, connectionPaint }: ConnectionProps) => {
   const path = React.useMemo(() => {
     const newPath = Skia.Path.Make();
     newPath.moveTo(fromNode.position.x, fromNode.position.y);
@@ -44,6 +40,4 @@ const ConnectionComponent = ({
   );
 };
 
-const Connection = React.memo(ConnectionComponent);
-
-export default Connection;
+export default React.memo(Connection);

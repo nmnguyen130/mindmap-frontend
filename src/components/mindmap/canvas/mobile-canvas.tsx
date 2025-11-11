@@ -2,28 +2,32 @@ import { Canvas, Group, Skia } from "@shopify/react-native-skia";
 import React, { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
 
+import { useFPSDetection } from "@/hooks/use-fps-detection";
 import { MindMapNode } from "@/stores/mindmaps";
 import { getNodeBox } from "@/utils/node-utils";
-import { useFPSDetection } from "@/hooks/use-fps-detection";
 
 import CanvasActionButtons from "../ui/canvas-action-buttons";
-import NodeSelectionPanel from "../ui/node-selection-panel";
 import FPSOverlay from "../ui/fps-overlay";
+import NodeSelectionPanel from "../ui/node-selection-panel";
 
 import Connection from "./connection";
 import GestureHandler from "./gesture-handler";
 import Node from "./node";
+import ViewportCulling, { ViewportVisualization } from "./viewport-culling";
 
 interface MobileCanvasProps {
   nodes: MindMapNode[];
 }
 
 const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
-  // FPS detection hook
-  const { isInteracting, fpsMetrics, startInteraction, stopInteraction } = useFPSDetection();
+  // FPS monitoring
+  const { isInteracting, fpsMetrics, startInteraction, stopInteraction } =
+    useFPSDetection();
 
-  // Simple state for selected node
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+
+  // Canvas dimensions
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 
   const selectedNode = selectedNodeId
     ? nodes.find((node) => node.id === selectedNodeId) || null
@@ -48,10 +52,10 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
     };
   }, []);
 
-  // Fast lookup map for nodes
+  // Quick node lookup map
   const nodeMap = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
 
-  // Find node at touch point using bounding box
+  // Find node at touch position
   const findNodeAtPoint = useCallback(
     (point: { x: number; y: number }): MindMapNode | null => {
       for (const node of nodes) {
@@ -82,57 +86,80 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
     [findNodeAtPoint, selectedNodeId]
   );
 
-  // Deselect node
+  // Clear selection
   const deselectNode = useCallback(() => {
     if (selectedNodeId) {
       setSelectedNodeId(null);
     }
   }, [selectedNodeId]);
 
-  // Render connections
-  const renderConnections = useMemo(() => {
-    if (!nodes.length) return null;
+  // Render connections - show all links where at least one node is visible
+  const renderConnections = React.useCallback(
+    (visibleNodes: MindMapNode[]) => {
+      if (visibleNodes.length === 0) return null;
 
-    const conns: React.ReactNode[] = [];
-    for (const node of nodes) {
-      for (const targetId of node.connections) {
-        const target = nodeMap.get(targetId);
-        if (target) {
-          conns.push(
-            <Connection
-              key={`${node.id}-${targetId}`}
-              fromNode={node}
-              toNode={target}
-              connectionPaint={paints.connection}
-            />
-          );
+      const visibleNodeIds = new Set(visibleNodes.map((node) => node.id));
+      const connectionComponents: React.ReactNode[] = [];
+
+      for (const sourceNode of nodes) {
+        for (const targetId of sourceNode.connections) {
+          const targetNode = nodeMap.get(targetId);
+          if (!targetNode) continue;
+
+          // Draw connection if either end is on screen
+          if (
+            visibleNodeIds.has(sourceNode.id) ||
+            visibleNodeIds.has(targetNode.id)
+          ) {
+            connectionComponents.push(
+              <Connection
+                key={`${sourceNode.id}-${targetId}`}
+                fromNode={sourceNode}
+                toNode={targetNode}
+                connectionPaint={paints.connection}
+              />
+            );
+          }
         }
       }
-    }
-    return conns;
-  }, [nodes, nodeMap, paints.connection]);
 
-  // Render nodes
-  const renderNodes = useMemo(
-    () =>
-      nodes.map((node) => {
+      return connectionComponents;
+    },
+    [nodes, nodeMap, paints.connection]
+  );
+
+  // Render visible nodes
+  const renderNodes = React.useCallback(
+    (visibleNodes: MindMapNode[]) => {
+      if (visibleNodes.length === 0) return null;
+
+      return visibleNodes.map((node) => {
         const isSelected = selectedNodeId === node.id;
         return (
           <Node
             key={node.id}
             node={node}
             nodeFillPaint={paints.nodeFill}
-            nodeStrokePaint={isSelected ? paints.selectedNodeStroke : paints.nodeStroke}
+            nodeStrokePaint={
+              isSelected ? paints.selectedNodeStroke : paints.nodeStroke
+            }
             textPaint={paints.text}
           />
         );
-      }),
-    [nodes, selectedNodeId, paints]
+      });
+    },
+    [selectedNodeId, paints]
   );
 
   return (
-    <View className="flex-1 bg-gray-50">
-      <GestureHandler 
+    <View
+      className="flex-1 bg-gray-50"
+      onLayout={(event) => {
+        const { width, height } = event.nativeEvent.layout;
+        setCanvasSize({ width, height });
+      }}
+    >
+      <GestureHandler
         onSingleTap={handleNodeTap}
         onInteractionStart={startInteraction}
         onInteractionEnd={stopInteraction}
@@ -140,21 +167,35 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
         {(matrix, focalPoint) => {
           return (
             <Canvas style={{ flex: 1 }}>
+              {/* Viewport overlay */}
+              <ViewportVisualization screenSize={canvasSize} />
+
+              {/* World content with gesture transforms */}
               <Group matrix={matrix}>
-                {/* Draw connections */}
-                {renderConnections}
-                {/* Draw nodes */}
-                {renderNodes}
+                <ViewportCulling
+                  matrix={matrix}
+                  nodes={nodes}
+                  screenSize={canvasSize}
+                >
+                  {(visibleNodes) => (
+                    <>
+                      {/* Draw connections */}
+                      {renderConnections(visibleNodes)}
+                      {/* Draw nodes */}
+                      {renderNodes(visibleNodes)}
+                    </>
+                  )}
+                </ViewportCulling>
               </Group>
             </Canvas>
           );
         }}
       </GestureHandler>
-      
+
       {/* FPS Overlay */}
       <FPSOverlay isVisible={isInteracting} metrics={fpsMetrics} />
-      
-      {/* Selection Panel */}
+
+      {/* Node Details Panel */}
       <NodeSelectionPanel selectedNode={selectedNode} />
 
       {/* Action Buttons */}

@@ -29,7 +29,7 @@ const font = matchFont({
   fontSize: FONT_SIZE,
 });
 
-const NodeComponent = ({
+const Node = ({
   node,
   nodeFillPaint,
   nodeStrokePaint,
@@ -114,6 +114,4 @@ const NodeComponent = ({
   );
 };
 
-const Node = React.memo(NodeComponent);
-
-export default Node;
+export default React.memo(Node);

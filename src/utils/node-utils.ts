@@ -73,12 +73,6 @@ export function calculateNodeBox(
   };
 }
 
-/**
- * Calculate complete node box from node data
- */
-export function getNodeBox(node: { text: string; position: { x: number; y: number } }): NodeBox {
-  return calculateNodeBoxFromText(node.text, node.position);
-}
 
 /**
  * Calculate complete node box from text and position
@@ -89,4 +83,12 @@ export function calculateNodeBoxFromText(
 ): NodeBox {
   const dimensions = calculateNodeDimensions(text);
   return calculateNodeBox(position, dimensions);
+}
+
+
+/**
+ * Calculate complete node box from node data
+ */
+export function getNodeBox(node: { text: string; position: { x: number; y: number } }): NodeBox {
+  return calculateNodeBoxFromText(node.text, node.position);
 }

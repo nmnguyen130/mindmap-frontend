@@ -82,8 +82,10 @@ const GestureHandler = ({
       const nextScale = clamp(lastScale.value * raw_scale, 0.5, 3);
 
       // Compute world coordinates under current focal point for smooth scaling
-      const worldX = (focalPoint.value.x - currentPosition.value.x) / currentScale.value;
-      const worldY = (focalPoint.value.y - currentPosition.value.y) / currentScale.value;
+      const worldX =
+        (focalPoint.value.x - currentPosition.value.x) / currentScale.value;
+      const worldY =
+        (focalPoint.value.y - currentPosition.value.y) / currentScale.value;
 
       currentPosition.value = {
         x: focalPoint.value.x - worldX * nextScale,

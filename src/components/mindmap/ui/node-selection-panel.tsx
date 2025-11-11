@@ -1,31 +1,47 @@
-import React from 'react';
-import { View, Text } from 'react-native';
+import React from "react";
+import { Text, View } from "react-native";
 
-import { MindMapNode } from '@/stores/mindmaps';
-import { getNodeBox } from '@/utils/node-utils';
+import { MindMapNode } from "@/stores/mindmaps";
+import { getNodeBox } from "@/utils/node-utils";
 
 interface NodeSelectionPanelProps {
   selectedNode: MindMapNode | null;
 }
 
-const InfoText = ({ label, value, children }: { label?: string; value?: string; children?: React.ReactNode }) => (
+const InfoText = ({
+  label,
+  value,
+  children,
+}: {
+  label?: string;
+  value?: string;
+  children?: React.ReactNode;
+}) => (
   <Text className="text-gray-300 text-xs font-mono mb-0.5">
-    {label ? `${label}: ` : ''}
+    {label ? `${label}: ` : ""}
     {value ?? children}
   </Text>
 );
 
-const NodeSelectionPanel  = ({ selectedNode }: NodeSelectionPanelProps) => {
+const NodeSelectionPanel = ({ selectedNode }: NodeSelectionPanelProps) => {
   if (!selectedNode) return null;
 
   const box = getNodeBox(selectedNode);
 
   return (
     <View className="absolute top-2 right-2 bg-black/80 p-3 rounded-lg min-w-48">
-      <Text className="text-white text-xs font-bold mb-1">Selected Node Info:</Text>
+      <Text className="text-white text-xs font-bold mb-1">
+        Selected Node Info:
+      </Text>
       <InfoText label="Text" value={selectedNode.text} />
-      <InfoText label="Position" value={`(${selectedNode.position.x}, ${selectedNode.position.y})`} />
-      <InfoText label="Connections" value={selectedNode.connections.length.toString()} />
+      <InfoText
+        label="Position"
+        value={`(${selectedNode.position.x}, ${selectedNode.position.y})`}
+      />
+      <InfoText
+        label="Connections"
+        value={selectedNode.connections.length.toString()}
+      />
 
       <Text className="text-white text-xs font-bold mb-1">Bounding Box:</Text>
       <InfoText label="Left" value={box.left.toFixed(1)} />

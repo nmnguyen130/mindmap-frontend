@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, TouchableOpacity, Text } from 'react-native';
+import React from "react";
+import { Text, TouchableOpacity, View } from "react-native";
 
-import { MindMapNode } from '@/stores/mindmaps';
+import { MindMapNode } from "@/stores/mindmaps";
 
 interface CanvasActionButtonsProps {
   selectedNode: MindMapNode | null;
@@ -10,7 +10,7 @@ interface CanvasActionButtonsProps {
 
 const CanvasActionButtons = ({
   selectedNode,
-  onDeselect
+  onDeselect,
 }: CanvasActionButtonsProps) => {
   return (
     <View className="absolute bottom-5 left-5 right-5 flex-row justify-center">

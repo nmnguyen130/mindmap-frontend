@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from "react";
 
 interface FPSMetrics {
   current: number;
@@ -41,7 +41,8 @@ export function useFPSDetection() {
         frameCount.current++;
 
         // Calculate FPS every second for accuracy
-        if (frameCount.current >= 60) { // Sample over 60 frames (~1 second at 60fps)
+        if (frameCount.current >= 60) {
+          // Sample over 60 frames (~1 second at 60fps)
           const deltaTime = currentTime - lastFrameTime.current;
           const fps = Math.round((frameCount.current * 1000) / deltaTime);
 
@@ -54,7 +55,8 @@ export function useFPSDetection() {
           // Calculate metrics
           const current = fps;
           const average = Math.round(
-            fpsHistory.current.reduce((sum, f) => sum + f, 0) / fpsHistory.current.length
+            fpsHistory.current.reduce((sum, f) => sum + f, 0) /
+              fpsHistory.current.length
           );
 
           setFpsMetrics({ current, average });
