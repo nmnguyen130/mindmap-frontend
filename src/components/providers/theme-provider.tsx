@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import { useColorScheme } from "react-native";
+
+import { databaseService } from "@/services/database";
 
 export type Theme = "light" | "dark" | "system";
 
@@ -114,15 +116,45 @@ export const ThemeProvider = ({
 }: ThemeProviderProps) => {
   const deviceTheme = useColorScheme();
   const [theme, setThemeState] = useState<Theme>(defaultTheme);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load theme from SQLite on mount
+  useEffect(() => {
+    async function loadTheme() {
+      try {
+        const db = await databaseService.getDatabase();
+        const result = await db.getFirstAsync<{ value: string }>(
+          "SELECT value FROM settings WHERE key = 'theme'"
+        );
+        if (result?.value) {
+          setThemeState(result.value as Theme);
+        }
+      } catch (error) {
+        console.log("Could not load theme from database:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadTheme();
+  }, []);
 
   const isDark =
     theme === "dark" || (theme === "system" && deviceTheme === "dark");
   const colors = isDark ? darkTheme : lightTheme;
 
-  const setTheme = (newTheme: Theme) => {
+  const setTheme = async (newTheme: Theme) => {
     setThemeState(newTheme);
-    // TODO: Could save to SQLite in the future if needed
-    console.log("Theme changed to:", newTheme);
+    // Save to SQLite
+    try {
+      const db = await databaseService.getDatabase();
+      await db.runAsync(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES ('theme', ?)",
+        [newTheme]
+      );
+      // console.log("Theme saved to database:", newTheme);
+    } catch (error) {
+      console.error("Could not save theme to database:", error);
+    }
   };
 
   const value = {
@@ -131,6 +163,11 @@ export const ThemeProvider = ({
     setTheme,
     isDark,
   };
+
+  // Don't render children until theme is loaded
+  if (isLoading) {
+    return null;
+  }
 
   return (
     <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>

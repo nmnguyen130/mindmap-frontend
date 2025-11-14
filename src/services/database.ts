@@ -3,6 +3,9 @@ import * as SQLite from "expo-sqlite";
 export interface MindMapRow {
   id: string;
   title: string;
+  // TODO(ai): When AI/source document features are implemented, consider
+  // extending this row (or adding a related table) to store metadata such as
+  // source file URL, original document URL, and AI processing status.
   created_at: string;
   updated_at: string;
 }
@@ -76,6 +79,12 @@ class DatabaseService {
         FOREIGN KEY (mindmap_id) REFERENCES mindmaps(id) ON DELETE CASCADE,
         FOREIGN KEY (from_node_id) REFERENCES mindmap_nodes(id) ON DELETE CASCADE,
         FOREIGN KEY (to_node_id) REFERENCES mindmap_nodes(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
 
       CREATE INDEX IF NOT EXISTS idx_nodes_mindmap_id ON mindmap_nodes(mindmap_id);
@@ -289,6 +298,11 @@ class DatabaseService {
       await this.db.closeAsync();
       this.db = null;
     }
+  }
+
+  // Expose database instance for direct access when needed
+  async getDatabase(): Promise<SQLite.SQLiteDatabase> {
+    return await this.initialize();
   }
 }
 
