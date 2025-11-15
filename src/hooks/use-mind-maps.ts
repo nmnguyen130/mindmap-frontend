@@ -27,6 +27,7 @@ function mindMapFromRow(
       text: node.text,
       position: { x: node.position_x, y: node.position_y },
       connections: nodeConnections,
+      notes: node.notes ?? null,
     });
   });
 
@@ -96,6 +97,7 @@ export function useCreateMindMap() {
           text: node.text,
           position_x: node.position.x,
           position_y: node.position.y,
+          notes: node.notes ?? null,
         };
         await databaseService.createNode(nodeRow);
 
@@ -157,6 +159,7 @@ export function useUpdateMindMap() {
               text: node.text,
               position_x: node.position.x,
               position_y: node.position.y,
+              notes: node.notes ?? null,
             });
           } else {
             // Create new node
@@ -166,6 +169,7 @@ export function useUpdateMindMap() {
               text: node.text,
               position_x: node.position.x,
               position_y: node.position.y,
+              notes: node.notes ?? null,
             });
           }
         }

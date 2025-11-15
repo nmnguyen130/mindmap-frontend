@@ -2,11 +2,11 @@ import { Canvas, Group, Skia } from "@shopify/react-native-skia";
 import React, { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
 
+import { useTheme } from "@/components/providers/theme-provider";
 import { useFPSDetection } from "@/hooks/use-fps-detection";
 import { MindMapNode } from "@/stores/mindmaps";
 import { getNodeBox } from "@/utils/node-utils";
 
-import CanvasActionButtons from "../ui/canvas-action-buttons";
 import FPSOverlay from "../ui/fps-overlay";
 import NodeSelectionPanel from "../ui/node-selection-panel";
 
@@ -20,6 +20,8 @@ interface MobileCanvasProps {
 }
 
 const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
+  const { colors } = useTheme();
+
   // FPS monitoring
   const { isInteracting, fpsMetrics, startInteraction, stopInteraction } =
     useFPSDetection();
@@ -28,10 +30,6 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
 
   // Canvas dimensions
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
-
-  const selectedNode = selectedNodeId
-    ? nodes.find((node) => node.id === selectedNodeId) || null
-    : null;
 
   const paints = useMemo(() => {
     const createPaint = (color: string, style = 0, strokeWidth = 1) => {
@@ -54,6 +52,40 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
 
   // Quick node lookup map
   const nodeMap = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
+
+  const selectedNode = useMemo(() => {
+    if (!selectedNodeId) return null;
+    return nodeMap.get(selectedNodeId) ?? null;
+  }, [selectedNodeId, nodeMap]);
+
+  const relatedNodes = useMemo(() => {
+    if (!selectedNode) return [];
+
+    const neighbors: MindMapNode[] = [];
+
+    // Outgoing connections (children)
+    selectedNode.connections.forEach((targetId) => {
+      const target = nodeMap.get(targetId);
+      if (target) {
+        neighbors.push(target);
+      }
+    });
+
+    // Incoming connections (parents)
+    nodes.forEach((node) => {
+      if (node.id !== selectedNode.id && node.connections.includes(selectedNode.id)) {
+        neighbors.push(node);
+      }
+    });
+
+    // Deduplicate by id
+    const seen = new Set<string>();
+    return neighbors.filter((node) => {
+      if (seen.has(node.id)) return false;
+      seen.add(node.id);
+      return true;
+    });
+  }, [selectedNode, nodeMap, nodes]);
 
   // Find node at touch position
   const findNodeAtPoint = useCallback(
@@ -153,7 +185,8 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
 
   return (
     <View
-      className="flex-1 bg-gray-50"
+      className="flex-1"
+      style={{ backgroundColor: colors.background }}
       onLayout={(event) => {
         const { width, height } = event.nativeEvent.layout;
         setCanvasSize({ width, height });
@@ -196,12 +229,10 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
       <FPSOverlay isVisible={isInteracting} metrics={fpsMetrics} />
 
       {/* Node Details Panel */}
-      <NodeSelectionPanel selectedNode={selectedNode} />
-
-      {/* Action Buttons */}
-      <CanvasActionButtons
+      <NodeSelectionPanel
         selectedNode={selectedNode}
-        onDeselect={deselectNode}
+        colors={colors}
+        relatedNodes={relatedNodes}
       />
     </View>
   );

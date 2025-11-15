@@ -17,6 +17,7 @@ export interface MindMapNode {
   text: string;
   position: { x: number; y: number };
   connections: string[];
+  notes?: string | null;
 }
 
 // Helper functions for database operations
@@ -90,6 +91,7 @@ interface MindMapState {
   updateMap: (id: string, data: Omit<MindMap, "id" | "createdAt" | "updatedAt">) => Promise<MindMap>;
   deleteMap: (id: string) => Promise<void>;
   setCurrentMap: (map: MindMap | null) => void;
+  updateNodeNotes: (nodeId: string, notes: string | null) => Promise<void>;
 }
 
 export const useMindMapStore = create<MindMapState>()(
@@ -123,6 +125,7 @@ export const useMindMapStore = create<MindMapState>()(
                   text: node.text,
                   position: { x: node.position_x, y: node.position_y },
                   connections: nodeConnections,
+                  notes: node.notes ?? null,
                 });
               });
 
@@ -140,6 +143,38 @@ export const useMindMapStore = create<MindMapState>()(
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
           set({ error: message, isLoading: false });
+        }
+      },
+
+      updateNodeNotes: async (nodeId, notes) => {
+        try {
+          await databaseService.updateNode(nodeId, {
+            notes: notes ?? null,
+          });
+
+          set((state) => {
+            // Update nodes inside all maps
+            state.maps.forEach((map) => {
+              map.nodes.forEach((node) => {
+                if (node.id === nodeId) {
+                  node.notes = notes ?? null;
+                }
+              });
+            });
+
+            // Update current map snapshot
+            if (state.currentMap) {
+              state.currentMap.nodes.forEach((node) => {
+                if (node.id === nodeId) {
+                  node.notes = notes ?? null;
+                }
+              });
+            }
+          });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          set({ error: message });
+          throw err;
         }
       },
 
@@ -164,6 +199,7 @@ export const useMindMapStore = create<MindMapState>()(
               text: node.text,
               position: { x: node.position_x, y: node.position_y },
               connections: nodeConnections,
+              notes: node.notes ?? null,
             });
           });
 
@@ -189,7 +225,10 @@ export const useMindMapStore = create<MindMapState>()(
           const now = new Date();
 
           // Create mind map
-          await databaseService.createMindMap({ id, title: data.title });
+          await databaseService.createMindMap({
+            id,
+            title: data.title,
+          });
 
           // Save nodes and connections
           await saveNodesAndConnections(id, data.nodes);
@@ -220,7 +259,9 @@ export const useMindMapStore = create<MindMapState>()(
           const now = new Date();
 
           // Update mind map title
-          await databaseService.updateMindMap(id, { title: data.title });
+          await databaseService.updateMindMap(id, {
+            title: data.title,
+          });
 
           // Replace all nodes and connections (simple approach)
           await replaceNodesAndConnections(id, data.nodes);

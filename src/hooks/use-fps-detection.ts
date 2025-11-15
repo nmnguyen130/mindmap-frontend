@@ -6,6 +6,18 @@ interface FPSMetrics {
 }
 
 export function useFPSDetection() {
+  // In production, return a no-op implementation to avoid
+  // unnecessary performance measurements and overlays.
+  if (!__DEV__) {
+    const noop = () => {};
+    return {
+      isInteracting: false,
+      fpsMetrics: { current: 0, average: 0 },
+      startInteraction: noop,
+      stopInteraction: noop,
+    };
+  }
+
   const [isInteracting, setIsInteracting] = useState(false);
   const [fpsMetrics, setFpsMetrics] = useState<FPSMetrics>({
     current: 0,

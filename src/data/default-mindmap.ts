@@ -10,18 +10,22 @@ export const defaultMindMap: MindMap = {
       id: "central-node",
       text: "Central Idea",
       position: { x: 400, y: 300 },
+      notes:
+        "This is the central idea of the demo map. Imagine it as the main topic or chapter of your document.",
       connections: ["node-1", "node-2", "node-3", "node-4"],
     },
     {
       id: "node-1",
       text: "Concept 1 and concep 2",
       position: { x: 200, y: 150 },
+      notes: "High-level summary for concept 1. Replace this with your own notes from the source.",
       connections: ["node-1-1", "node-1-2"],
     },
     {
       id: "node-2",
       text: "Concept 2",
       position: { x: 600, y: 150 },
+      notes: "Short description of concept 2.",
       connections: ["node-2-1"],
     },
     {

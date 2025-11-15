@@ -7,7 +7,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import Header from '@/components/layout/header';
 import { useMindMapStore } from '@/stores/mindmaps';
 import { useTheme } from '@/components/providers/theme-provider';
-import QuickActionButton from '@/components/home/quick-action-button';
+import ActionButton from '@/components/ui/action-button';
 import MindMapListItem from '@/components/home/mindmap-list-item';
 
 const HomeScreen = () => {
@@ -75,36 +75,29 @@ const HomeScreen = () => {
               Quick actions
             </Text>
 
-            <QuickActionButton
+            <ActionButton
               title="Create New Mind Map"
               description="Start from a blank canvas."
               icon="add-circle-outline"
-              backgroundColor={colors.primary}
-              titleColor={colors.primaryForeground}
-              descriptionColor={colors.primaryForeground}
-              iconColor={colors.primaryForeground}
+              variant="primary"
               onPress={handleCreateMindMap}
+              className="mb-3"
             />
 
-            <QuickActionButton
+            <ActionButton
               title="View Demo Mind Map"
               description="Explore a pre-built example."
               icon="play-circle-outline"
-              backgroundColor={colors.success}
-              titleColor="#ffffff"
-              descriptionColor="#ffffff"
-              iconColor="#ffffff"
+              variant="success"
               onPress={handleOpenDemoMindMap}
+              className="mb-3"
             />
 
-            <QuickActionButton
+            <ActionButton
               title="Store Manager"
               description="Inspect and manage stored data."
               icon="storage"
-              backgroundColor={colors.warning}
-              titleColor="#ffffff"
-              descriptionColor="#ffffff"
-              iconColor="#ffffff"
+              variant="warning"
               onPress={() => router.push('/mindmap/store-manager')}
               compact
             />

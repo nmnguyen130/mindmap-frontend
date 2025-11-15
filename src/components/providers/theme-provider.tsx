@@ -5,7 +5,7 @@ import { databaseService } from "@/services/database";
 
 export type Theme = "light" | "dark" | "system";
 
-interface ThemeColors {
+export interface ThemeColors {
   // Primary colors
   primary: string;
   primaryForeground: string;

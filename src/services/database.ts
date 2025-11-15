@@ -16,6 +16,7 @@ export interface MindMapNodeRow {
   text: string;
   position_x: number;
   position_y: number;
+  notes?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -103,7 +104,7 @@ class DatabaseService {
     );
 
     const currentVersion = result?.user_version || 0;
-    const targetVersion = 1;
+    const targetVersion = 2;
 
     // Run migrations if needed
     for (
@@ -121,6 +122,12 @@ class DatabaseService {
     switch (version) {
       case 1:
         // Initial schema is already created in createTables()
+        break;
+      case 2:
+        // Add optional notes field to mindmap_nodes for per-node summaries
+        await this.db.execAsync(
+          "ALTER TABLE mindmap_nodes ADD COLUMN notes TEXT"
+        );
         break;
       // Future migrations can be added here
     }
@@ -189,8 +196,15 @@ class DatabaseService {
   ): Promise<string> {
     const db = await this.initialize();
     await db.runAsync(
-      "INSERT INTO mindmap_nodes (id, mindmap_id, text, position_x, position_y) VALUES (?, ?, ?, ?, ?)",
-      [node.id, node.mindmap_id, node.text, node.position_x, node.position_y]
+      "INSERT INTO mindmap_nodes (id, mindmap_id, text, position_x, position_y, notes) VALUES (?, ?, ?, ?, ?, ?)",
+      [
+        node.id,
+        node.mindmap_id,
+        node.text,
+        node.position_x,
+        node.position_y,
+        node.notes ?? null,
+      ]
     );
     return node.id; // Since ID is manually provided as PRIMARY KEY, return it directly
   }
@@ -205,7 +219,9 @@ class DatabaseService {
 
   async updateNode(
     id: string,
-    updates: Partial<Pick<MindMapNodeRow, "text" | "position_x" | "position_y">>
+    updates: Partial<
+      Pick<MindMapNodeRow, "text" | "position_x" | "position_y" | "notes">
+    >
   ): Promise<void> {
     const db = await this.initialize();
     const setParts: string[] = [];
@@ -222,6 +238,11 @@ class DatabaseService {
     if (updates.position_y !== undefined) {
       setParts.push("position_y = ?");
       values.push(updates.position_y);
+    }
+
+    if (updates.notes !== undefined) {
+      setParts.push("notes = ?");
+      values.push(updates.notes ?? null);
     }
 
     if (setParts.length === 0) return;
