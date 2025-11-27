@@ -20,9 +20,9 @@ interface MobileCanvasProps {
 }
 
 const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
 
-  // FPS monitoring
+  // FPS monitoring for development
   const { isInteracting, fpsMetrics, startInteraction, stopInteraction } =
     useFPSDetection();
 
@@ -42,13 +42,13 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
     };
 
     return {
-      nodeFill: createPaint("#dbeafe"),
-      nodeStroke: createPaint("#60a5fa", 1, 2),
-      selectedNodeStroke: createPaint("#ef4444", 1, 3),
-      connection: createPaint("#93c5fd", 1, 2),
-      text: createPaint("#1e40af"),
+      nodeFill: createPaint(isDark ? "#1e293b" : "#dbeafe"),
+      nodeStroke: createPaint(colors.connection, 1, 2),
+      selectedNodeStroke: createPaint(colors.primary, 1, 3),
+      connection: createPaint(colors.connection, 1, 2),
+      text: createPaint(isDark ? "#f1f5f9" : "#1e40af"),
     };
-  }, []);
+  }, [colors, isDark]);
 
   // Quick node lookup map
   const nodeMap = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
@@ -200,7 +200,7 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
         {(matrix, focalPoint) => {
           return (
             <Canvas style={{ flex: 1 }}>
-              {/* Viewport overlay */}
+              {/* Viewport overlay for development */}
               <ViewportVisualization screenSize={canvasSize} />
 
               {/* World content with gesture transforms */}
@@ -225,7 +225,7 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
         }}
       </GestureHandler>
 
-      {/* FPS Overlay */}
+      {/* FPS Overlay - for development */}
       <FPSOverlay isVisible={isInteracting} metrics={fpsMetrics} />
 
       {/* Node Details Panel */}
@@ -233,6 +233,7 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
         selectedNode={selectedNode}
         colors={colors}
         relatedNodes={relatedNodes}
+        onClose={deselectNode}
       />
     </View>
   );

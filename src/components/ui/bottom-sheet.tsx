@@ -1,11 +1,11 @@
 import { ReactNode, useEffect } from "react";
 import { Pressable, Text, View, useWindowDimensions } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { scheduleOnRN } from "react-native-worklets";
 
 import { useTheme } from "@/components/providers/theme-provider";
@@ -59,7 +59,7 @@ const BottomSheet = ({
     })
     .onEnd((event) => {
       "worklet";
-      const shouldClose = event.translationY > 80 || event.velocityY > 600;
+      const shouldClose = event.translationY > 120 || event.velocityY > 600;
 
       if (shouldClose) {
         scheduleOnRN(onClose);

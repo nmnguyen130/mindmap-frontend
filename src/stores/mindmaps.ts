@@ -147,33 +147,41 @@ export const useMindMapStore = create<MindMapState>()(
       },
 
       updateNodeNotes: async (nodeId, notes) => {
+        const previousState = get();
+        
+        // Optimistic update
+        set((state) => {
+          state.maps.forEach((map) => {
+            map.nodes.forEach((node) => {
+              if (node.id === nodeId) {
+                node.notes = notes ?? null;
+              }
+            });
+          });
+
+          if (state.currentMap) {
+            state.currentMap.nodes.forEach((node) => {
+              if (node.id === nodeId) {
+                node.notes = notes ?? null;
+              }
+            });
+          }
+        });
+
         try {
           await databaseService.updateNode(nodeId, {
             notes: notes ?? null,
           });
-
-          set((state) => {
-            // Update nodes inside all maps
-            state.maps.forEach((map) => {
-              map.nodes.forEach((node) => {
-                if (node.id === nodeId) {
-                  node.notes = notes ?? null;
-                }
-              });
-            });
-
-            // Update current map snapshot
-            if (state.currentMap) {
-              state.currentMap.nodes.forEach((node) => {
-                if (node.id === nodeId) {
-                  node.notes = notes ?? null;
-                }
-              });
-            }
-          });
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
-          set({ error: message });
+          
+          // Rollback on error
+          set((state) => {
+            state.maps = previousState.maps;
+            state.currentMap = previousState.currentMap;
+            state.error = message;
+          });
+          
           throw err;
         }
       },

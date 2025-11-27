@@ -5,10 +5,9 @@ import {
   Edge,
   MiniMap,
   Node,
-  Panel,
   ReactFlow,
 } from "@xyflow/react";
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 
 import { MindMapNode } from "@/stores/mindmaps";
 import "@xyflow/react/dist/style.css";
@@ -82,16 +81,6 @@ const WebCanvas = ({ nodes }: WebCanvasProps) => {
         <Controls />
         <MiniMap />
         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
-        <Panel position="top-left">
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
-            <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
-              Mind Map View
-            </div>
-            <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-              <div>• All data persists offline</div>
-            </div>
-          </div>
-        </Panel>
       </ReactFlow>
     </div>
   );
