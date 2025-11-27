@@ -1,58 +1,108 @@
-import { View, Text, TextInput, Pressable } from 'react-native'
-import { useState } from 'react'
+import { View, Text, Pressable, Alert } from 'react-native';
+import { useState } from 'react';
+import { useRouter } from 'expo-router';
 
-import { useLogin } from '@/services/auth'
-import { useAuthStore } from '@/stores/auth'
+import { useLogin } from '@/hooks/use-auth';
+import { useTheme } from '@/components/providers/theme-provider';
+import FormScreen from '@/components/ui/form-screen';
+import ThemedTextInput from '@/components/ui/text-input';
+import ActionButton from '@/components/ui/action-button';
 
 const LoginScreen = () => {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const login = useLogin()
-  const { login: loginStore } = useAuthStore()
+  const [email, setEmail] = useState('workflow@example.com');
+  const [password, setPassword] = useState('Workflow123!');
+  const router = useRouter();
+  const { colors } = useTheme();
+  const login = useLogin();
 
   const handleLogin = async () => {
-    try {
-      await login.mutateAsync({ email, password })
-      await loginStore(email, password)
-    } catch (error) {
-      console.error('Login failed:', error)
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Error', 'Please enter both email and password');
+      return;
     }
-  }
+
+    try {
+      await login.mutateAsync({ email: email.trim(), password });
+      router.back();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Login failed';
+      Alert.alert('Login Failed', message);
+    }
+  };
 
   return (
-    <View className="flex-1 justify-center items-center p-4 bg-white dark:bg-black">
-      <Text className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">
-        Login
-      </Text>
+    <View className="flex-1" style={{ backgroundColor: colors.background }}>
+      <FormScreen>
+        <View className="flex-1 justify-center">
+          {/* Header */}
+          <View className="mb-12">
+            <Text
+              className="text-4xl font-bold mb-2"
+              style={{ color: colors.foreground }}
+            >
+              Welcome Back
+            </Text>
+            <Text
+              className="text-base"
+              style={{ color: colors.mutedForeground }}
+            >
+              Sign in to your account
+            </Text>
+          </View>
 
-      <TextInput
-        className="w-full p-3 border border-gray-300 rounded-lg mb-4 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
+          {/* Form */}
+          <View className="mb-6">
+            <ThemedTextInput
+              label="Email"
+              placeholder="you@example.com"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+              leftIcon="email"
+              editable={!login.isPending}
+            />
 
-      <TextInput
-        className="w-full p-3 border border-gray-300 rounded-lg mb-6 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
+            <ThemedTextInput
+              label="Password"
+              placeholder="Enter your password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              autoComplete="password"
+              leftIcon="lock"
+              editable={!login.isPending}
+            />
+          </View>
 
-      <Pressable
-        className="w-full p-3 bg-blue-500 rounded-lg"
-        onPress={handleLogin}
-        disabled={login.isPending}
-      >
-        <Text className="text-white text-center font-semibold">
-          {login.isPending ? 'Logging in...' : 'Login'}
-        </Text>
-      </Pressable>
+          {/* Login Button */}
+          <ActionButton
+            title={login.isPending ? 'Signing in...' : 'Sign In'}
+            variant="primary"
+            onPress={handleLogin}
+            disabled={login.isPending}
+          />
+
+          {/* Register Link */}
+          <View className="flex-row justify-center items-center mt-8">
+            <Text style={{ color: colors.mutedForeground }}>
+              Don't have an account?{' '}
+            </Text>
+            <Pressable onPress={() => router.push('/register' as any)}>
+              <Text
+                className="font-semibold"
+                style={{ color: colors.primary }}
+              >
+                Sign Up
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </FormScreen>
     </View>
-  )
-}
+  );
+};
 
 export default LoginScreen;

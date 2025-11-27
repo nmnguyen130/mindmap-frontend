@@ -14,6 +14,7 @@ export interface ActionButtonProps {
   onPress: () => void;
   compact?: boolean;
   className?: string;
+  disabled?: boolean;
 }
 
 const ActionButton = ({
@@ -24,6 +25,7 @@ const ActionButton = ({
   onPress,
   compact,
   className,
+  disabled,
 }: ActionButtonProps) => {
   const { colors } = useTheme();
   const paddingClass = compact ? "p-3" : "p-4";
@@ -79,14 +81,16 @@ const ActionButton = ({
   return (
     <Pressable
       onPress={onPress}
-      className={`flex-row items-center justify-between ${paddingClass} rounded-xl ${className ?? ""}`}
+      disabled={disabled}
+      className={`flex-row items-center ${icon ? 'justify-between' : 'justify-center'} ${paddingClass} rounded-xl ${className ?? ""}`}
       style={{
         backgroundColor,
         borderColor: hasBorder ? colors.border : undefined,
         borderWidth: hasBorder ? 1 : 0,
+        opacity: disabled ? 0.5 : 1,
       }}
     >
-      <View className="flex-1 mr-3">
+      <View className={icon ? "flex-1 mr-3" : "items-center"}>
         <Text
           className="text-base font-semibold mb-1"
           style={{ color: titleColor }}
@@ -107,3 +111,4 @@ const ActionButton = ({
 };
 
 export default ActionButton;
+
