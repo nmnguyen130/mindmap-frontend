@@ -201,7 +201,7 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
           return (
             <Canvas style={{ flex: 1 }}>
               {/* Viewport overlay for development */}
-              <ViewportVisualization screenSize={canvasSize} />
+              {/* <ViewportVisualization screenSize={canvasSize} /> */}
 
               {/* World content with gesture transforms */}
               <Group matrix={matrix}>

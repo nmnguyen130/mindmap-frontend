@@ -28,7 +28,6 @@ interface ViewportVisualizationProps {
   screenSize: { width: number; height: number };
 }
 
-const VIEWPORT_SIZE = { width: 200, height: 200 };
 const CULLING_MARGIN = 50;
 const FONT_SIZE = 10;
 
@@ -46,11 +45,11 @@ export const ViewportVisualization = ({
 
   // Screen coords for active culling area (viewport + margin)
   const activeViewportLeft =
-    screenCenterX - (VIEWPORT_SIZE.width / 2 + CULLING_MARGIN);
+    screenCenterX - (screenSize.width / 2 + CULLING_MARGIN);
   const activeViewportTop =
-    screenCenterY - (VIEWPORT_SIZE.height / 2 + CULLING_MARGIN);
-  const activeViewportWidth = VIEWPORT_SIZE.width + 2 * CULLING_MARGIN;
-  const activeViewportHeight = VIEWPORT_SIZE.height + 2 * CULLING_MARGIN;
+    screenCenterY - (screenSize.height / 2 + CULLING_MARGIN);
+  const activeViewportWidth = screenSize.width + 2 * CULLING_MARGIN;
+  const activeViewportHeight = screenSize.height + 2 * CULLING_MARGIN;
 
   return (
     <>
@@ -76,20 +75,20 @@ export const ViewportVisualization = ({
 
       {/* Main viewport rectangle */}
       <RoundedRect
-        x={screenCenterX - VIEWPORT_SIZE.width / 2}
-        y={screenCenterY - VIEWPORT_SIZE.height / 2}
-        width={VIEWPORT_SIZE.width}
-        height={VIEWPORT_SIZE.height}
+        x={screenCenterX - screenSize.width / 2}
+        y={screenCenterY - screenSize.height / 2}
+        width={screenSize.width}
+        height={screenSize.height}
         r={4}
         color="rgba(59, 130, 246, 0.1)"
       />
 
       {/* Viewport border */}
       <RoundedRect
-        x={screenCenterX - VIEWPORT_SIZE.width / 2}
-        y={screenCenterY - VIEWPORT_SIZE.height / 2}
-        width={VIEWPORT_SIZE.width}
-        height={VIEWPORT_SIZE.height}
+        x={screenCenterX - screenSize.width / 2}
+        y={screenCenterY - screenSize.height / 2}
+        width={screenSize.width}
+        height={screenSize.height}
         r={4}
         color="#3b82f6"
         style="stroke"
@@ -98,8 +97,8 @@ export const ViewportVisualization = ({
 
       {/* Label */}
       <Text
-        x={screenCenterX - VIEWPORT_SIZE.width / 2 + 8}
-        y={screenCenterY - VIEWPORT_SIZE.height / 2 + 16}
+        x={screenCenterX - screenSize.width / 2 + 8}
+        y={screenCenterY - screenSize.height / 2 + 16}
         text="Viewport"
         font={font}
         color="#3b82f6"
@@ -148,16 +147,16 @@ const ViewportCulling = ({
 
     // Convert screen viewport to world coordinates
     const worldViewportLeft =
-      (viewportCenterX - VIEWPORT_SIZE.width / 2 - cameraTranslateX) /
+      (viewportCenterX - screenWidth / 2 - cameraTranslateX) /
       currentScale;
     const worldViewportRight =
-      (viewportCenterX + VIEWPORT_SIZE.width / 2 - cameraTranslateX) /
+      (viewportCenterX + screenWidth / 2 - cameraTranslateX) /
       currentScale;
     const worldViewportTop =
-      (viewportCenterY - VIEWPORT_SIZE.height / 2 - cameraTranslateY) /
+      (viewportCenterY - screenHeight / 2 - cameraTranslateY) /
       currentScale;
     const worldViewportBottom =
-      (viewportCenterY + VIEWPORT_SIZE.height / 2 - cameraTranslateY) /
+      (viewportCenterY + screenHeight / 2 - cameraTranslateY) /
       currentScale;
 
     // Add margin for smooth scrolling

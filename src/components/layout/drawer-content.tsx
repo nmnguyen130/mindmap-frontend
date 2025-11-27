@@ -121,14 +121,16 @@ const DrawerContent = (props: DrawerContentComponentProps) => {
               style={{ color: colors.primaryForeground }}
               numberOfLines={1}
             >
-              {isAuthenticated && user ? user.name || "User" : "Guest"}
+              {isAuthenticated && user
+                ? user.email.split('@')[0].charAt(0).toUpperCase() + user.email.split('@')[0].slice(1)
+                : "Guest"}
             </Text>
             <Text
               className="text-sm"
               style={{ color: colors.primaryForeground + "CC" }}
               numberOfLines={1}
             >
-              {isAuthenticated && user ? user.email : "Not logged in"}
+              {isAuthenticated && user ? user.email : "Please log in to continue"}
             </Text>
           </View>
         </View>

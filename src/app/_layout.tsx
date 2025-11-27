@@ -2,6 +2,7 @@ import "../global.css";
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
+import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
   SafeAreaProvider,
@@ -9,6 +10,7 @@ import {
 } from "react-native-safe-area-context";
 
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { useAuth } from "@/hooks/use-auth";
 import { queryClient } from "@/services/api";
 import { databaseService } from "@/services/database";
 
@@ -16,6 +18,13 @@ import { databaseService } from "@/services/database";
 databaseService.initialize().catch(console.error);
 
 const RootLayout = () => {
+  const { initializeAuth } = useAuth();
+
+  // Initialize auth on app start to restore user session
+  useEffect(() => {
+    initializeAuth();
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>

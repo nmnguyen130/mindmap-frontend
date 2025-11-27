@@ -1,13 +1,14 @@
 import { router } from "expo-router";
 import { useState } from "react";
 import * as DocumentPicker from "expo-document-picker";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, Text, TextInput, View } from "react-native";
 
 import Header from "@/components/layout/header";
 import FormScreen from "@/components/ui/form-screen";
 import SourceDocumentSection from "@/components/mindmap/create/source-document-section";
 import { useTheme } from "@/components/providers/theme-provider";
 import { useMindMapStore } from "@/stores/mindmaps";
+import { useCreateFromPdf } from "@/hooks/use-pdf";
 
 interface SelectedFile {
   name: string;
@@ -26,8 +27,9 @@ const CreateMindMapScreen = () => {
   const [title, setTitle] = useState("");
   const [documentUrl, setDocumentUrl] = useState("");
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
-  const { createMap, setCurrentMap, isLoading } = useMindMapStore();
+  const { isLoading, createFromPdf: createFromPdfStore } = useMindMapStore();
   const { colors } = useTheme();
+  const createFromPdf = useCreateFromPdf();
 
   const handleBackPress = () => {
     router.back();
@@ -59,51 +61,53 @@ const CreateMindMapScreen = () => {
 
   const handleCreate = async () => {
     const trimmedTitle = title.trim();
-    const trimmedUrl = documentUrl.trim();
 
     if (!trimmedTitle) {
       return;
     }
 
-    const hasFile = !!selectedFile;
-    const hasUrl = trimmedUrl.length > 0;
-    const sourceType: MindMapAISourceContext["type"] = hasFile
-      ? hasUrl
-        ? "file_and_url"
-        : "file"
-      : hasUrl
-        ? "url"
-        : "none";
+    if (!selectedFile) {
+      Alert.alert('No File Selected', 'Please select a PDF file to create a mindmap');
+      return;
+    }
 
-    const aiSourceContext: MindMapAISourceContext = {
-      type: sourceType,
-      file: selectedFile ?? undefined,
-      url: hasUrl ? trimmedUrl : undefined,
-    };
-
-    // TODO(ai): When backend and AI pipeline are ready, send `aiSourceContext`
-    // together with the newly created mind map to an AI analysis endpoint
-    // (e.g. Supabase Edge Function) for suggestions and automatic node drafting.
-
+    // Upload PDF and create mindmap from backend
     try {
-      const newMap = await createMap({
+      const result = await createFromPdf.mutateAsync({
+        file: {
+          uri: selectedFile.uri,
+          name: selectedFile.name,
+          type: selectedFile.mimeType || 'application/pdf',
+        },
         title: trimmedTitle,
-        nodes: [],
+        generateMindmap: true,
       });
-      setCurrentMap(newMap);
-      router.push(`/mindmap/${newMap.id}`);
+
+      // Transform and store mindmap from backend
+      if (result.mindmap) {
+        await createFromPdfStore(
+          result.mindmap.id,
+          result.mindmap.title,
+          result.mindmap.mindmap_data
+        );
+        router.push(`/mindmap/${result.mindmap.id}`);
+      } else {
+        Alert.alert('Error', 'Backend did not generate a mindmap. Please try again.');
+      }
     } catch (error) {
-      console.error("Create mind map failed:", error);
+      const message = error instanceof Error ? error.message : 'Failed to upload PDF';
+      console.error("PDF upload failed:", error);
+      Alert.alert('Upload Failed', message);
     }
   };
 
-  const canSubmit = title.trim().length > 0 && !isLoading;
+  const canSubmit = title.trim().length > 0 && !isLoading && !createFromPdf.isPending;
 
   return (
     <View className="flex-1" style={{ backgroundColor: colors.background }}>
       <Header
         title="Create Mind Map"
-        onMenuPress={() => {}}
+        onMenuPress={() => { }}
         showBackButton
         onBackPress={handleBackPress}
       />
@@ -174,7 +178,7 @@ const CreateMindMapScreen = () => {
               className="text-base font-semibold"
               style={{ color: colors.primaryForeground }}
             >
-              {isLoading ? "Creating..." : "Create mind map"}
+              {createFromPdf.isPending ? "Uploading..." : isLoading ? "Creating..." : "Create mind map"}
             </Text>
           </Pressable>
         </View>
