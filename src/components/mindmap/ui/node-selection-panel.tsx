@@ -14,7 +14,7 @@ import {
 } from "react-native";
 
 import { ThemeColors } from "@/components/providers/theme-provider";
-import { MindMapNode, useMindMapStore } from "@/stores/mindmaps";
+import { MindMapNode, useMindMapStore } from "@/stores/mindmap";
 
 interface NodeSelectionPanelProps {
   selectedNode: MindMapNode | null;
@@ -114,7 +114,7 @@ const NodeSelectionPanel = ({
     // TODO: Send query to AI service
     // TODO: Display AI response in chat-like interface
     // TODO: Offer options to add AI insights to notes or create new nodes
-    
+
     console.log("AI Query:", aiQuery, "for node:", selectedNode.text);
     setAiQuery("");
     Keyboard.dismiss();

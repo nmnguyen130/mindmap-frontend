@@ -1,4 +1,4 @@
-import { MindMap, MindMapNode } from "@/stores/mindmaps";
+import { MindMap, MindMapNode } from "@/stores/mindmap";
 
 export const defaultMindMap: MindMap = {
   id: "default-demo",

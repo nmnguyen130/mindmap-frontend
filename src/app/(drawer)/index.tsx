@@ -5,7 +5,7 @@ import { DrawerActions } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import Header from '@/components/layout/header';
-import { useMindMapStore } from '@/stores/mindmaps';
+import { useMindMapStore } from '@/stores/mindmap';
 import { useTheme } from '@/components/providers/theme-provider';
 import ActionButton from '@/components/ui/action-button';
 import MindMapListItem from '@/components/home/mindmap-list-item';

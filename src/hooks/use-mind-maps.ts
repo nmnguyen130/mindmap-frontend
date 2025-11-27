@@ -6,7 +6,7 @@ import {
   MindMapNodeRow,
   MindMapRow,
 } from "@/services/database";
-import { MindMap, MindMapNode } from "@/stores/mindmaps";
+import { MindMap, MindMapNode } from "@/stores/mindmap";
 
 // Convert database rows to store types
 function mindMapFromRow(

@@ -9,7 +9,7 @@ import {
 } from "@xyflow/react";
 import { useMemo } from "react";
 
-import { MindMapNode } from "@/stores/mindmaps";
+import { MindMapNode } from "@/stores/mindmap";
 import "@xyflow/react/dist/style.css";
 
 interface WebCanvasProps {

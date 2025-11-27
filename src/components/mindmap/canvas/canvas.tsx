@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 
-import { MindMapNode } from "@/stores/mindmaps";
+import { MindMapNode } from "@/stores/mindmap";
 
 import MobileCanvas from "./mobile-canvas";
 import WebCanvas from "./web-canvas";

@@ -14,7 +14,7 @@ import {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
-import { MindMapNode } from "@/stores/mindmaps";
+import { MindMapNode } from "@/stores/mindmap";
 import { getNodeBox } from "@/utils/node-utils";
 
 interface ViewportCullingProps {

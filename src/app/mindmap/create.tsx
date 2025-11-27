@@ -7,7 +7,7 @@ import Header from "@/components/layout/header";
 import FormScreen from "@/components/ui/form-screen";
 import SourceDocumentSection from "@/components/mindmap/create/source-document-section";
 import { useTheme } from "@/components/providers/theme-provider";
-import { useMindMapStore } from "@/stores/mindmaps";
+import { useMindMapStore } from "@/stores/mindmap";
 import { useCreateFromPdf } from "@/hooks/use-pdf";
 
 interface SelectedFile {

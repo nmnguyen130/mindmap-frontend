@@ -4,7 +4,7 @@ import { View } from "react-native";
 
 import { useTheme } from "@/components/providers/theme-provider";
 import { useFPSDetection } from "@/hooks/use-fps-detection";
-import { MindMapNode } from "@/stores/mindmaps";
+import { MindMapNode } from "@/stores/mindmap";
 import { getNodeBox } from "@/utils/node-utils";
 
 import FPSOverlay from "../ui/fps-overlay";
