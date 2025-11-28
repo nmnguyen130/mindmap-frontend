@@ -14,12 +14,14 @@ import {
 } from "react-native";
 
 import { ThemeColors } from "@/components/providers/theme-provider";
+import { useRagChat } from "@/hooks/use-rag-chat";
 import { MindMapNode, useMindMapStore } from "@/stores/mindmap";
 
 interface NodeSelectionPanelProps {
   selectedNode: MindMapNode | null;
   colors: ThemeColors;
   relatedNodes?: MindMapNode[];
+  mindmapId: string | null;
   onClose?: () => void;
 }
 
@@ -27,19 +29,27 @@ const NodeSelectionPanel = ({
   selectedNode,
   colors,
   relatedNodes = [],
+  mindmapId,
   onClose,
 }: NodeSelectionPanelProps) => {
-  const { currentMap, updateNodeNotes } = useMindMapStore();
-  const [draftNotes, setDraftNotes] = useState<string>("");
-  const [isSaving, setIsSaving] = useState(false);
+  const { getCurrentMap } = useMindMapStore();
   const [aiQuery, setAiQuery] = useState<string>("");
   const slideAnim = useRef(new Animated.Value(600)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const notesInputRef = useRef<TextInput>(null);
+  const backdropAnim = useRef(new Animated.Value(0)).current;
   const aiInputRef = useRef<TextInput>(null);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const chatScrollRef = useRef<ScrollView>(null);
 
-  // Animate panel in/out with better timing
+  const currentMap = getCurrentMap();
+
+  // RAG Chat hook
+  const { messages, isStreaming, sendMessage, generateSummary, clear } = useRagChat({
+    documentId: mindmapId || '',
+    onError: (error) => {
+      console.error('RAG Chat error:', error);
+    },
+  });
+
+  // Animate panel in/out
   useEffect(() => {
     if (selectedNode) {
       Animated.parallel([
@@ -49,7 +59,7 @@ const NodeSelectionPanel = ({
           tension: 65,
           friction: 9,
         }),
-        Animated.timing(fadeAnim, {
+        Animated.timing(backdropAnim, {
           toValue: 1,
           duration: 250,
           useNativeDriver: true,
@@ -62,63 +72,52 @@ const NodeSelectionPanel = ({
           duration: 200,
           useNativeDriver: true,
         }),
-        Animated.timing(fadeAnim, {
+        Animated.timing(backdropAnim, {
           toValue: 0,
           duration: 150,
           useNativeDriver: true,
         }),
       ]).start();
     }
-  }, [selectedNode, slideAnim, fadeAnim]);
+  }, [selectedNode, slideAnim, backdropAnim]);
 
-  // Sync draft notes with selected node
+  // Sync AI query state
   useEffect(() => {
-    if (selectedNode?.notes) {
-      setDraftNotes(selectedNode.notes);
-    } else {
-      setDraftNotes("");
-    }
     setAiQuery("");
-  }, [selectedNode?.id, selectedNode?.notes]);
+  }, [selectedNode?.id]);
 
-  // Handle saving notes with optimistic update
-  const handleSaveNotes = useCallback(async () => {
-    if (!selectedNode || !currentMap) return;
-
-    const trimmed = draftNotes.trim();
-    const newNotes = trimmed.length > 0 ? trimmed : null;
-
-    // Skip if unchanged
-    if (newNotes === selectedNode.notes) return;
-
-    setIsSaving(true);
-    try {
-      await updateNodeNotes(selectedNode.id, newNotes);
-    } catch (error) {
-      console.error("Failed to save notes:", error);
-      // Revert on error
-      setDraftNotes(selectedNode.notes || "");
-    } finally {
-      setIsSaving(false);
+  // Auto-generate summary when node is selected
+  useEffect(() => {
+    if (selectedNode && mindmapId && messages.length === 0) {
+      // Generate summary as first message
+      generateSummary(selectedNode.label, selectedNode.keywords || []);
     }
-  }, [selectedNode, currentMap, draftNotes, updateNodeNotes]);
+  }, [selectedNode?.id, mindmapId]);
+
+  // Clear messages when node changes
+  useEffect(() => {
+    if (!selectedNode) {
+      clear();
+    }
+  }, [selectedNode, clear]);
+
+  // Auto-scroll to bottom when new message appears
+  useEffect(() => {
+    if (messages.length > 0) {
+      setTimeout(() => {
+        chatScrollRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages.length]);
 
   // Handle AI query submission
-  // TODO: Implement AI API integration for deep understanding
-  // TODO: Add conversation history for context
-  // TODO: Support follow-up questions
-  // TODO: Generate mind map expansions from AI responses
   const handleAiQuery = useCallback(async () => {
-    if (!aiQuery.trim() || !selectedNode) return;
+    if (!aiQuery.trim() || isStreaming) return;
 
-    // TODO: Send query to AI service
-    // TODO: Display AI response in chat-like interface
-    // TODO: Offer options to add AI insights to notes or create new nodes
-
-    console.log("AI Query:", aiQuery, "for node:", selectedNode.label);
+    await sendMessage(aiQuery);
     setAiQuery("");
     Keyboard.dismiss();
-  }, [aiQuery, selectedNode]);
+  }, [aiQuery, isStreaming, sendMessage]);
 
   // Compute related topics summary
   const relatedSummary = useMemo(() => {
@@ -131,182 +130,213 @@ const NodeSelectionPanel = ({
 
   if (!selectedNode) return null;
 
-  const isEditable = !!currentMap;
-
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="absolute left-0 right-0 bottom-0"
-      keyboardVerticalOffset={0}
-    >
+    <>
+      {/* Backdrop Overlay */}
       <Animated.View
-        className="flex-1"
         style={{
-          transform: [{ translateY: slideAnim }],
-          opacity: fadeAnim,
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          opacity: backdropAnim,
         }}
+        pointerEvents={selectedNode ? 'auto' : 'none'}
       >
-        <View className="px-4 pb-6 flex-1">
-          <View
-            className="rounded-3xl shadow-2xl overflow-hidden"
-            style={{
-              backgroundColor: colors.surface,
-              maxHeight: "75%",
-              minHeight: 420,
-            }}
-          >
-            {/* Compact Header */}
-            <View
-              className="px-4 pt-3 pb-2 border-b"
-              style={{ borderBottomColor: colors.border }}
-            >
-              <View className="flex-row items-center justify-between">
-                <View className="flex-1 mr-2">
-                  <Text
-                    className="text-base font-bold leading-tight"
-                    style={{ color: colors.foreground }}
-                    numberOfLines={2}
-                  >
-                    {selectedNode.label}
-                  </Text>
-                  {relatedSummary && (
-                    <Text
-                      className="text-xs mt-1"
-                      style={{ color: colors.mutedForeground }}
-                      numberOfLines={1}
-                    >
-                      Connected: {relatedSummary}
-                    </Text>
-                  )}
-                </View>
-                <Pressable
-                  onPress={() => onClose?.()}
-                  className="w-8 h-8 rounded-full items-center justify-center"
-                  style={{ backgroundColor: colors.secondary }}
-                >
-                  <MaterialIcons
-                    name="close"
-                    size={18}
-                    color={colors.secondaryForeground}
-                  />
-                </Pressable>
-              </View>
-            </View>
+        <Pressable
+          style={{ flex: 1 }}
+          onPress={() => onClose?.()}
+        />
+      </Animated.View>
 
-            {/* Scrollable Content */}
-            <ScrollView
-              ref={scrollViewRef}
-              className="flex-1"
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
+      {/* Panel */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="absolute left-0 right-0 bottom-0"
+        keyboardVerticalOffset={0}
+        pointerEvents="box-none"
+      >
+        <Animated.View
+          className="flex-1"
+          style={{
+            transform: [{ translateY: slideAnim }],
+          }}
+          pointerEvents="box-none"
+        >
+          <View className="px-4 pb-6 flex-1" pointerEvents="box-none">
+            <View
+              className="rounded-3xl shadow-2xl overflow-hidden"
+              style={{
+                backgroundColor: colors.surface,
+                maxHeight: "100%",
+                minHeight: "80%",
+              }}
             >
-              {/* Notes Section */}
-              <View className="px-4 py-3">
-                <View className="flex-row items-center justify-between mb-2">
+              {/* Header */}
+              <View
+                className="px-4 pt-3 pb-2 border-b"
+                style={{ borderBottomColor: colors.border }}
+              >
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-1 mr-2">
+                    <Text
+                      className="text-base font-bold leading-tight"
+                      style={{ color: colors.foreground }}
+                      numberOfLines={2}
+                    >
+                      {selectedNode.label}
+                    </Text>
+                    {relatedSummary && (
+                      <Text
+                        className="text-xs mt-1"
+                        style={{ color: colors.mutedForeground }}
+                        numberOfLines={1}
+                      >
+                        Connected: {relatedSummary}
+                      </Text>
+                    )}
+                  </View>
+                  <Pressable
+                    onPress={() => onClose?.()}
+                    className="w-8 h-8 rounded-full items-center justify-center"
+                    style={{ backgroundColor: colors.secondary }}
+                  >
+                    <MaterialIcons
+                      name="close"
+                      size={18}
+                      color={colors.secondaryForeground}
+                    />
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Scrollable Content */}
+              <ScrollView
+                className="flex-1"
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {/* General Info Section */}
+                <View className="px-4 py-3 border-b" style={{ borderBottomColor: colors.border }}>
                   <Text
-                    className="text-xs font-bold uppercase"
+                    className="text-xs font-bold uppercase mb-2"
                     style={{ color: colors.mutedForeground }}
                   >
-                    Quick Notes
+                    General Information
                   </Text>
-                  {isSaving && (
-                    <View className="flex-row items-center gap-1">
-                      <ActivityIndicator size="small" color={colors.primary} />
-                      <Text className="text-xs" style={{ color: colors.primary }}>
-                        Saving...
+
+                  {/* Keywords */}
+                  {selectedNode.keywords && selectedNode.keywords.length > 0 && (
+                    <View className="mb-2">
+                      <Text className="text-xs mb-1" style={{ color: colors.mutedForeground }}>
+                        Keywords:
                       </Text>
+                      <View className="flex-row flex-wrap gap-1.5">
+                        {selectedNode.keywords.map((keyword, idx) => (
+                          <View
+                            key={idx}
+                            className="px-2.5 py-1 rounded-full"
+                            style={{ backgroundColor: colors.primary + '20' }}
+                          >
+                            <Text
+                              className="text-xs font-medium"
+                              style={{ color: colors.primary }}
+                            >
+                              {keyword}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
                     </View>
                   )}
-                </View>
 
-                {isEditable ? (
-                  <TextInput
-                    ref={notesInputRef}
-                    className="rounded-xl px-3 py-3 text-sm border"
-                    multiline
-                    value={draftNotes}
-                    onChangeText={setDraftNotes}
-                    onBlur={handleSaveNotes}
-                    placeholder="Add your notes and insights here..."
-                    placeholderTextColor={colors.mutedForeground}
-                    style={{
-                      borderColor: colors.border,
-                      backgroundColor: colors.background,
-                      color: colors.foreground,
-                      textAlignVertical: "top",
-                      minHeight: 100,
-                      maxHeight: 200,
-                    }}
-                    editable={!isSaving}
-                  />
-                ) : draftNotes ? (
-                  <View
-                    className="rounded-xl px-3 py-3 border"
-                    style={{
-                      borderColor: colors.border,
-                      backgroundColor: colors.background,
-                    }}
-                  >
-                    <Text className="text-sm leading-relaxed" style={{ color: colors.foreground }}>
-                      {draftNotes}
+                  {/* Level */}
+                  <View className="flex-row items-center gap-2 mb-2">
+                    <Text className="text-xs" style={{ color: colors.mutedForeground }}>
+                      Level:
+                    </Text>
+                    <Text className="text-xs font-semibold" style={{ color: colors.foreground }}>
+                      {selectedNode.level}
                     </Text>
                   </View>
-                ) : (
-                  <Text className="text-sm" style={{ color: colors.mutedForeground }}>
-                    No notes yet.
-                  </Text>
-                )}
-              </View>
-
-              {/* AI Chat Section - More Space */}
-              <View className="px-4 pb-4 flex-1">
-                <View className="flex-row items-center gap-2 mb-2">
-                  <MaterialIcons name="psychology" size={18} color={colors.primary} />
-                  <Text
-                    className="text-xs font-bold uppercase"
-                    style={{ color: colors.mutedForeground }}
-                  >
-                    Ask AI Assistant
-                  </Text>
                 </View>
 
-                {/* AI Chat Interface */}
-                <View
-                  className="rounded-xl border overflow-hidden"
-                  style={{
-                    borderColor: colors.border,
-                    backgroundColor: colors.background,
-                    minHeight: 160,
-                  }}
-                >
-                  {/* Chat Messages Area - TODO: Add message history */}
+                {/* AI Chat Section */}
+                <View className="px-4 py-3 flex-1">
+                  <View className="flex-row items-center gap-2 mb-2">
+                    <MaterialIcons name="psychology" size={18} color={colors.primary} />
+                    <Text
+                      className="text-xs font-bold uppercase"
+                      style={{ color: colors.mutedForeground }}
+                    >
+                      AI Assistant
+                    </Text>
+                  </View>
+
+                  {/* Chat Messages */}
                   <ScrollView
-                    className="flex-1 px-3 py-3"
+                    ref={chatScrollRef}
+                    className="rounded-xl border mb-3"
+                    style={{
+                      borderColor: colors.border,
+                      backgroundColor: colors.background,
+                      minHeight: 200,
+                      maxHeight: 300,
+                    }}
                     showsVerticalScrollIndicator={false}
                   >
-                    <Text className="text-xs leading-relaxed" style={{ color: colors.mutedForeground }}>
-                      Coming Soon: Ask questions about this topic and get AI-powered insights
-                    </Text>
-                    <View className="mt-2 gap-1">
-                      <Text className="text-xs" style={{ color: colors.mutedForeground }}>
-                        "Explain this concept in simple terms"
-                      </Text>
-                      <Text className="text-xs" style={{ color: colors.mutedForeground }}>
-                        "What are related topics I should explore?"
-                      </Text>
-                      <Text className="text-xs" style={{ color: colors.mutedForeground }}>
-                        "Generate a summary of key points"
-                      </Text>
+                    <View className="p-3 gap-3">
+                      {messages.length === 0 && !isStreaming ? (
+                        <Text className="text-xs text-center" style={{ color: colors.mutedForeground }}>
+                          Ask questions about this topic...
+                        </Text>
+                      ) : (
+                        messages.map((msg, idx) => (
+                          <View
+                            key={idx}
+                            className={`rounded-xl px-3 py-2 ${msg.role === 'user' ? 'self-end' : 'self-start'
+                              }`}
+                            style={{
+                              backgroundColor:
+                                msg.role === 'user'
+                                  ? colors.primary
+                                  : colors.secondary,
+                              maxWidth: '85%',
+                            }}
+                          >
+                            <Text
+                              className="text-sm leading-relaxed"
+                              style={{
+                                color:
+                                  msg.role === 'user'
+                                    ? colors.primaryForeground
+                                    : colors.secondaryForeground,
+                              }}
+                            >
+                              {msg.content}
+                            </Text>
+                          </View>
+                        ))
+                      )}
+                      {isStreaming && (
+                        <View className="flex-row items-center gap-2">
+                          <ActivityIndicator size="small" color={colors.primary} />
+                          <Text className="text-xs" style={{ color: colors.mutedForeground }}>
+                            AI is thinking...
+                          </Text>
+                        </View>
+                      )}
                     </View>
-                    {/* TODO: Render AI conversation history here */}
                   </ScrollView>
 
                   {/* AI Input Bar */}
                   <View
-                    className="border-t px-3 py-2"
-                    style={{ borderTopColor: colors.border }}
+                    className="rounded-xl border overflow-hidden"
+                    style={{ borderColor: colors.border, backgroundColor: colors.background }}
                   >
-                    <View className="flex-row items-center gap-2">
+                    <View className="flex-row items-center gap-2 px-3 py-2">
                       <TextInput
                         ref={aiInputRef}
                         className="flex-1 text-sm"
@@ -317,23 +347,24 @@ const NodeSelectionPanel = ({
                         style={{ color: colors.foreground }}
                         onSubmitEditing={handleAiQuery}
                         returnKeyType="send"
-                        editable={false} // TODO: Enable when AI is implemented
+                        editable={!isStreaming && !!mindmapId}
                       />
                       <Pressable
                         onPress={handleAiQuery}
-                        disabled={!aiQuery.trim()} // TODO: Remove disabled when AI is ready
+                        disabled={!aiQuery.trim() || isStreaming}
                         className="w-8 h-8 rounded-full items-center justify-center"
                         style={{
-                          backgroundColor: aiQuery.trim()
-                            ? colors.primary
-                            : colors.secondary,
+                          backgroundColor:
+                            aiQuery.trim() && !isStreaming
+                              ? colors.primary
+                              : colors.secondary,
                         }}
                       >
                         <MaterialIcons
                           name="send"
                           size={16}
                           color={
-                            aiQuery.trim()
+                            aiQuery.trim() && !isStreaming
                               ? colors.primaryForeground
                               : colors.mutedForeground
                           }
@@ -342,19 +373,12 @@ const NodeSelectionPanel = ({
                     </View>
                   </View>
                 </View>
-
-                {/* Quick Action Hints */}
-                <View className="mt-2 px-2">
-                  <Text className="text-xs" style={{ color: colors.mutedForeground }}>
-                    Tip: AI will help you understand complex topics and discover connections
-                  </Text>
-                </View>
-              </View>
-            </ScrollView>
+              </ScrollView>
+            </View>
           </View>
-        </View>
-      </Animated.View>
-    </KeyboardAvoidingView>
+        </Animated.View>
+      </KeyboardAvoidingView>
+    </>
   );
 };
 

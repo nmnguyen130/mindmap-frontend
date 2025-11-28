@@ -122,7 +122,7 @@ export const ThemeProvider = ({
   useEffect(() => {
     async function loadTheme() {
       try {
-        const db = await databaseService.getDatabase();
+        const db = await databaseService.initialize();
         const result = await db.getFirstAsync<{ value: string }>(
           "SELECT value FROM settings WHERE key = 'theme'"
         );
@@ -146,7 +146,7 @@ export const ThemeProvider = ({
     setThemeState(newTheme);
     // Save to SQLite
     try {
-      const db = await databaseService.getDatabase();
+      const db = await databaseService.initialize();
       await db.runAsync(
         "INSERT OR REPLACE INTO settings (key, value) VALUES ('theme', ?)",
         [newTheme]

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
+import { enableMapSet } from "immer";
 
 import { databaseService } from "@/services/database";
 import { calculateRadialLayout } from "@/utils/mindmap-layout";
@@ -14,6 +15,9 @@ import {
     type MindmapData,
     type MindMap,
 } from "./helpers/mindmap";
+
+// Enable Map/Set support in Immer
+enableMapSet();
 
 // ============================================================================
 // Store State Interface

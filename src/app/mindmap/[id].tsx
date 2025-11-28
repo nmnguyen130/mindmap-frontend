@@ -15,7 +15,7 @@ import { useMindMapStore, type MindMapNode } from "@/stores/mindmap";
 const MindMapScreen = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
-  const { maps, currentMap, loadMap, autoLayoutMap, isLoading, error } = useMindMapStore();
+  const { getCurrentMap, loadMap, autoLayoutMap, isLoading, error } = useMindMapStore();
   const [isActionsSheetVisible, setIsActionsSheetVisible] = useState(false);
   const [isLayouting, setIsLayouting] = useState(false);
 
@@ -48,8 +48,8 @@ const MindMapScreen = () => {
       return defaultMindMap;
     }
 
-    return currentMap || maps.find((m) => m.id === id) || null;
-  }, [id, currentMap, maps]);
+    return getCurrentMap();
+  }, [id, getCurrentMap]);
 
   const isDemo = id === "default";
 

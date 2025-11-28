@@ -27,7 +27,7 @@ const CreateMindMapScreen = () => {
   const [title, setTitle] = useState("");
   const [documentUrl, setDocumentUrl] = useState("");
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
-  const { isLoading, createFromPdf: createFromPdfStore } = useMindMapStore();
+  const { isLoading, createFromPdf: createFromPdfStore, createMap } = useMindMapStore();
   const { colors } = useTheme();
   const createFromPdf = useCreateFromPdf();
 
@@ -66,38 +66,66 @@ const CreateMindMapScreen = () => {
       return;
     }
 
-    if (!selectedFile) {
-      Alert.alert('No File Selected', 'Please select a PDF file to create a mindmap');
-      return;
-    }
-
-    // Upload PDF and create mindmap from backend
     try {
-      const result = await createFromPdf.mutateAsync({
-        file: {
-          uri: selectedFile.uri,
-          name: selectedFile.name,
-          type: selectedFile.mimeType || 'application/pdf',
-        },
-        title: trimmedTitle,
-        generateMindmap: true,
-      });
+      if (selectedFile) {
+        // Flow A: With PDF - Upload to backend for AI processing
+        const result = await createFromPdf.mutateAsync({
+          file: {
+            uri: selectedFile.uri,
+            name: selectedFile.name,
+            type: selectedFile.mimeType || 'application/pdf',
+          },
+          title: trimmedTitle,
+          generateMindmap: true,
+        });
 
-      // Transform and store mindmap from backend
-      if (result.mindmap) {
-        await createFromPdfStore(
-          result.mindmap.id,
-          result.mindmap.title,
-          result.mindmap.mindmap_data
-        );
-        router.push(`/mindmap/${result.mindmap.id}`);
+        // Store mindmap from backend response
+        if (result.mindmap) {
+          // Ensure edges have IDs (backend might not include them)
+          const transformedData = {
+            ...result.mindmap.mindmap_data,
+            edges: result.mindmap.mindmap_data.edges.map((edge: any) => ({
+              ...edge,
+              id: edge.id || `edge-${Date.now()}-${Math.random()}`,
+            })),
+          };
+
+          await createFromPdfStore(
+            result.mindmap.id,
+            result.mindmap.title,
+            transformedData
+          );
+          router.push(`/mindmap/${result.mindmap.id}`);
+        } else {
+          Alert.alert('Error', 'Backend did not generate a mindmap. Please try again.');
+        }
       } else {
-        Alert.alert('Error', 'Backend did not generate a mindmap. Please try again.');
+        // Flow B: Without PDF - Create blank mindmap locally
+        const blankMindmapData = {
+          title: trimmedTitle,
+          central_topic: trimmedTitle,
+          summary: '',
+          nodes: [
+            {
+              id: `node-${Date.now()}`,
+              label: trimmedTitle,
+              level: 0,
+              parent_id: null,
+              keywords: [],
+              position: { x: 0, y: 0 },
+              notes: null,
+            }
+          ],
+          edges: [],
+        };
+
+        const createdMap = await createMap(blankMindmapData);
+        router.push(`/mindmap/${createdMap.id}`);
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to upload PDF';
-      console.error("PDF upload failed:", error);
-      Alert.alert('Upload Failed', message);
+      const message = error instanceof Error ? error.message : 'Failed to create mindmap';
+      console.error("Mindmap creation failed:", error);
+      Alert.alert('Creation Failed', message);
     }
   };
 
@@ -129,8 +157,7 @@ const CreateMindMapScreen = () => {
             className="text-sm"
             style={{ color: colors.mutedForeground }}
           >
-            Give your mind map a clear title and optionally attach a document as
-            a starting point.
+            Give your mind map a clear title. Optionally attach a PDF document to generate AI-powered content.
           </Text>
         </View>
 
