@@ -4,7 +4,7 @@ import { View } from "react-native";
 
 import { useTheme } from "@/components/providers/theme-provider";
 import { useFPSDetection } from "@/hooks/use-fps-detection";
-import { MindMapNode } from "@/stores/mindmap";
+import { MindMapNode, MindmapData } from "@/stores/mindmap";
 import { getNodeBox } from "@/utils/node-utils";
 
 import FPSOverlay from "../ui/fps-overlay";
@@ -17,9 +17,10 @@ import ViewportCulling, { ViewportVisualization } from "./viewport-culling";
 
 interface MobileCanvasProps {
   nodes: MindMapNode[];
+  edges: MindmapData['edges'];
 }
 
-const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
+const MobileCanvas = ({ nodes, edges }: MobileCanvasProps) => {
   const { colors, isDark } = useTheme();
 
   // FPS monitoring for development
@@ -63,18 +64,14 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
 
     const neighbors: MindMapNode[] = [];
 
-    // Outgoing connections (children)
-    selectedNode.connections.forEach((targetId) => {
-      const target = nodeMap.get(targetId);
-      if (target) {
-        neighbors.push(target);
-      }
-    });
-
-    // Incoming connections (parents)
-    nodes.forEach((node) => {
-      if (node.id !== selectedNode.id && node.connections.includes(selectedNode.id)) {
-        neighbors.push(node);
+    // Find neighbors through edges
+    edges.forEach(edge => {
+      if (edge.from === selectedNode.id) {
+        const target = nodeMap.get(edge.to);
+        if (target) neighbors.push(target);
+      } else if (edge.to === selectedNode.id) {
+        const source = nodeMap.get(edge.from);
+        if (source) neighbors.push(source);
       }
     });
 
@@ -85,7 +82,7 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
       seen.add(node.id);
       return true;
     });
-  }, [selectedNode, nodeMap, nodes]);
+  }, [selectedNode, nodeMap, edges]);
 
   // Find node at touch position
   const findNodeAtPoint = useCallback(
@@ -133,31 +130,31 @@ const MobileCanvas = ({ nodes }: MobileCanvasProps) => {
       const visibleNodeIds = new Set(visibleNodes.map((node) => node.id));
       const connectionComponents: React.ReactNode[] = [];
 
-      for (const sourceNode of nodes) {
-        for (const targetId of sourceNode.connections) {
-          const targetNode = nodeMap.get(targetId);
-          if (!targetNode) continue;
+      edges.forEach((edge) => {
+        const sourceNode = nodeMap.get(edge.from);
+        const targetNode = nodeMap.get(edge.to);
 
-          // Draw connection if either end is on screen
-          if (
-            visibleNodeIds.has(sourceNode.id) ||
-            visibleNodeIds.has(targetNode.id)
-          ) {
-            connectionComponents.push(
-              <Connection
-                key={`${sourceNode.id}-${targetId}`}
-                fromNode={sourceNode}
-                toNode={targetNode}
-                connectionPaint={paints.connection}
-              />
-            );
-          }
+        if (!sourceNode || !targetNode) return;
+
+        // Draw connection if either end is on screen
+        if (
+          visibleNodeIds.has(sourceNode.id) ||
+          visibleNodeIds.has(targetNode.id)
+        ) {
+          connectionComponents.push(
+            <Connection
+              key={`${edge.from}-${edge.to}`}
+              fromNode={sourceNode}
+              toNode={targetNode}
+              connectionPaint={paints.connection}
+            />
+          );
         }
-      }
+      });
 
       return connectionComponents;
     },
-    [nodes, nodeMap, paints.connection]
+    [nodes, nodeMap, paints.connection, edges]
   );
 
   // Render visible nodes

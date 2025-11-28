@@ -1,4 +1,4 @@
-import { MindMapNode } from "@/stores/mindmap";
+import { MindMapNode, MindmapData } from "@/stores/mindmap";
 
 interface LayoutNode {
     id: string;
@@ -15,7 +15,7 @@ interface LayoutNode {
  * - Evenly distributes nodes to avoid overlap
  * - Modern, clear visual hierarchy
  */
-export function calculateRadialLayout(nodes: MindMapNode[]): MindMapNode[] {
+export function calculateRadialLayout(nodes: MindMapNode[], edges: MindmapData['edges']): MindMapNode[] {
     if (nodes.length === 0) return nodes;
 
     // Step 1: Build hierarchy (find root and levels)
@@ -27,13 +27,17 @@ export function calculateRadialLayout(nodes: MindMapNode[]): MindMapNode[] {
         nodeMap.set(node.id, {
             id: node.id,
             level: 0,
-            children: node.connections || [],
+            children: [],
         });
+    });
 
-        // Track parent-child relationships
-        node.connections.forEach(childId => {
-            childToParent.set(childId, node.id);
-        });
+    // Build connections from edges
+    edges.forEach(edge => {
+        const parentNode = nodeMap.get(edge.from);
+        if (parentNode) {
+            parentNode.children.push(edge.to);
+            childToParent.set(edge.to, edge.from);
+        }
     });
 
     // Find root node (node with no parent)
@@ -55,11 +59,14 @@ export function calculateRadialLayout(nodes: MindMapNode[]): MindMapNode[] {
     const visited = new Set<string>();
 
     while (queue.length > 0) {
-        const currentId = queue.shift()!;
+        const currentId = queue.shift();
+        if (!currentId) continue;
+
         if (visited.has(currentId)) continue;
         visited.add(currentId);
 
-        const current = nodeMap.get(currentId)!;
+        const current = nodeMap.get(currentId);
+        if (!current) continue;
 
         // Process children
         current.children.forEach(childId => {
@@ -128,24 +135,27 @@ export function calculateRadialLayout(nodes: MindMapNode[]): MindMapNode[] {
  * Compact Radial Layout - Better for dense graphs
  * Uses parent angle to position children in sectors
  */
-export function calculateCompactRadialLayout(nodes: MindMapNode[]): MindMapNode[] {
+export function calculateCompactRadialLayout(nodes: MindMapNode[], edges: MindmapData['edges']): MindMapNode[] {
     if (nodes.length === 0) return nodes;
 
     // Build hierarchy
     const nodeMap = new Map<string, { node: MindMapNode; children: string[]; parent?: string }>();
 
     nodes.forEach(node => {
-        nodeMap.set(node.id, { node, children: node.connections || [] });
-        node.connections.forEach(childId => {
-            const child = nodeMap.get(childId);
-            if (child) {
-                child.parent = node.id;
-            }
-        });
+        nodeMap.set(node.id, { node, children: [] });
+    });
+
+    edges.forEach(edge => {
+        const parentNode = nodeMap.get(edge.from);
+        const childNode = nodeMap.get(edge.to);
+        if (parentNode && childNode) {
+            parentNode.children.push(edge.to);
+            childNode.parent = edge.from;
+        }
     });
 
     // Find root
-    let rootId = nodes.find(n => !Array.from(nodeMap.values()).some(v => v.children.includes(n.id)))?.id || nodes[0].id;
+    let rootId = nodes.find(n => !nodeMap.get(n.id)?.parent)?.id || nodes[0].id;
 
     const positions = new Map<string, { x: number; y: number }>();
     const BASE_RADIUS = 200;

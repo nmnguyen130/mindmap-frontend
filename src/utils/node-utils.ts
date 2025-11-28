@@ -89,6 +89,7 @@ export function calculateNodeBoxFromText(
 /**
  * Calculate complete node box from node data
  */
-export function getNodeBox(node: { text: string; position: { x: number; y: number } }): NodeBox {
-  return calculateNodeBoxFromText(node.text, node.position);
+export function getNodeBox(node: { label: string; position?: { x: number; y: number } }): NodeBox {
+  const position = node.position || { x: 0, y: 0 };
+  return calculateNodeBoxFromText(node.label, position);
 }

@@ -23,44 +23,56 @@ const StoreManagerScreen = () => {
       const testNodes: MindMapNode[] = [
         {
           id: `node1-${timestamp}`,
-          text: "Main Topic",
+          label: "Main Topic",
+          keywords: ["main"],
+          level: 0,
+          parent_id: null,
           position: { x: 100, y: 100 },
-          connections: [`node2-${timestamp}`, `node3-${timestamp}`],
         },
         {
           id: `node2-${timestamp}`,
-          text: "Sub Topic 1",
+          label: "Sub Topic 1",
+          keywords: ["sub1"],
+          level: 1,
+          parent_id: `node1-${timestamp}`,
           position: { x: 200, y: 50 },
-          connections: [`node4-${timestamp}`],
         },
         {
           id: `node3-${timestamp}`,
-          text: "Sub Topic 2",
+          label: "Sub Topic 2",
+          keywords: ["sub2"],
+          level: 1,
+          parent_id: `node1-${timestamp}`,
           position: { x: 200, y: 150 },
-          connections: [],
         },
         {
           id: `node4-${timestamp}`,
-          text: "Detail Topic",
+          label: "Detail Topic",
+          keywords: ["detail"],
+          level: 2,
+          parent_id: `node2-${timestamp}`,
           position: { x: 300, y: 50 },
-          connections: [],
         },
+      ];
+
+      const testEdges = [
+        { from: `node1-${timestamp}`, to: `node2-${timestamp}` },
+        { from: `node1-${timestamp}`, to: `node3-${timestamp}` },
+        { from: `node2-${timestamp}`, to: `node4-${timestamp}` },
       ];
 
       const newMap = await createMap({
         title: "Test Mind Map",
+        central_topic: "Main Topic",
         nodes: testNodes,
+        edges: testEdges,
       });
 
       // Verify the data was saved - createMap already adds to local state
       // Just check that the returned map has the expected data
       if (newMap.nodes.length === 4) {
-        const totalConnections = newMap.nodes.reduce(
-          (acc, node) => acc + node.connections.length,
-          0
-        );
         addLog(
-          `Created: ${newMap.nodes.length} nodes, ${totalConnections} connections`
+          `Created: ${newMap.nodes.length} nodes, ${newMap.edges.length} connections`
         );
 
         // Also test database persistence by reloading after a delay
@@ -113,29 +125,26 @@ const StoreManagerScreen = () => {
       const updatedNodes = [...mapToUpdate.nodes];
       updatedNodes.push({
         id: `node5-${timestamp}`,
-        text: "New Node Added via Update",
+        label: "New Node Added via Update",
+        keywords: ["new"],
+        level: 1,
+        parent_id: updatedNodes[0]?.id || null,
         position: { x: 150, y: 200 },
-        connections: [`${updatedNodes[0]?.id}`], // Connect to main topic
       });
 
-      // Modify existing connections - remove one, add another
+      const updatedEdges = [...mapToUpdate.edges];
       if (updatedNodes[0]) {
-        // Main topic
-        const mainNode = updatedNodes[0];
-        // Remove connection to second node, add connection to new node
-        const secondNodeId = updatedNodes[1]?.id;
-        const newNodeId = `node5-${timestamp}`;
-
-        const currentConnections = mainNode.connections || [];
-        mainNode.connections = currentConnections
-          .filter((id) => id !== secondNodeId) // Remove connection to second node
-          .concat(newNodeId); // Add connection to new node
+        updatedEdges.push({
+          from: updatedNodes[0].id,
+          to: `node5-${timestamp}`
+        });
       }
 
       const { updateMap } = useMindMapStore.getState();
       await updateMap(mapToUpdate.id, {
         ...mapToUpdate,
         nodes: updatedNodes,
+        edges: updatedEdges,
       });
 
       addLog("Update completed");
@@ -157,20 +166,17 @@ const StoreManagerScreen = () => {
       addLog(`Database contains ${maps.length} mind maps:`);
 
       maps.forEach((map, index) => {
-        const totalConnections = map.nodes.reduce(
-          (acc, node) => acc + node.connections.length,
-          0
-        );
         addLog(`  ${index + 1}. "${map.title}" (ID: ${map.id})`);
         addLog(
-          `     ${map.nodes.length} nodes, ${totalConnections} connections`
+          `     ${map.nodes.length} nodes, ${map.edges.length} connections`
         );
 
         map.nodes.forEach((node) => {
-          addLog(`       - ${node.id}: "${node.text}"`);
-          if (node.connections.length > 0) {
-            addLog(`         Connected to: ${node.connections.join(", ")}`);
-          }
+          addLog(`       - ${node.id}: "${node.label}"`);
+        });
+
+        map.edges.forEach(edge => {
+          addLog(`         Edge: ${edge.from} -> ${edge.to}`);
         });
         addLog(""); // Empty line between maps
       });

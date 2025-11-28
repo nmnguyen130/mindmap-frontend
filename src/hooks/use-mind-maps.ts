@@ -6,7 +6,7 @@ import {
   MindMapNodeRow,
   MindMapRow,
 } from "@/services/database";
-import { MindMap, MindMapNode } from "@/stores/mindmap";
+import { MindMap, MindMapNode, MindmapData } from "@/stores/mindmap";
 
 // Convert database rows to store types
 function mindMapFromRow(
@@ -14,27 +14,29 @@ function mindMapFromRow(
   nodes: MindMapNodeRow[],
   connections: ConnectionRow[]
 ): MindMap {
-  const nodeMap = new Map<string, MindMapNode>();
+  const mappedNodes: MindMapNode[] = nodes.map((node) => ({
+    id: node.id,
+    label: node.label,
+    keywords: JSON.parse(node.keywords || "[]"),
+    level: node.level,
+    parent_id: node.parent_id ?? null,
+    position: { x: node.position_x, y: node.position_y },
+    notes: node.notes ?? null,
+  }));
 
-  // Convert nodes
-  nodes.forEach((node) => {
-    const nodeConnections = connections
-      .filter((conn) => conn.from_node_id === node.id)
-      .map((conn) => conn.to_node_id);
-
-    nodeMap.set(node.id, {
-      id: node.id,
-      text: node.text,
-      position: { x: node.position_x, y: node.position_y },
-      connections: nodeConnections,
-      notes: node.notes ?? null,
-    });
-  });
+  const edges = connections.map((conn) => ({
+    from: conn.from_node_id,
+    to: conn.to_node_id,
+    relationship: conn.relationship ?? undefined,
+  }));
 
   return {
     id: row.id,
     title: row.title,
-    nodes: Array.from(nodeMap.values()),
+    central_topic: row.central_topic ?? "",
+    summary: row.summary ?? undefined,
+    nodes: mappedNodes,
+    edges: edges,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };
@@ -85,6 +87,8 @@ export function useCreateMindMap() {
       const row: Omit<MindMapRow, "created_at" | "updated_at"> = {
         id,
         title: mindMap.title,
+        central_topic: mindMap.central_topic,
+        summary: mindMap.summary,
       };
 
       await databaseService.createMindMap(row);
@@ -94,23 +98,27 @@ export function useCreateMindMap() {
         const nodeRow: Omit<MindMapNodeRow, "created_at" | "updated_at"> = {
           id: node.id,
           mindmap_id: id,
-          text: node.text,
-          position_x: node.position.x,
-          position_y: node.position.y,
+          label: node.label,
+          keywords: JSON.stringify(node.keywords),
+          level: node.level,
+          parent_id: node.parent_id,
+          position_x: node.position?.x ?? 0,
+          position_y: node.position?.y ?? 0,
           notes: node.notes ?? null,
         };
         await databaseService.createNode(nodeRow);
+      }
 
-        // Create connections
-        for (const targetId of node.connections) {
-          const connectionRow: Omit<ConnectionRow, "created_at"> = {
-            id: `${node.id}-${targetId}`,
-            mindmap_id: id,
-            from_node_id: node.id,
-            to_node_id: targetId,
-          };
-          await databaseService.createConnection(connectionRow);
-        }
+      // Create connections (edges)
+      for (const edge of mindMap.edges) {
+        const connectionRow: Omit<ConnectionRow, "created_at"> = {
+          id: `${edge.from}-${edge.to}`,
+          mindmap_id: id,
+          from_node_id: edge.from,
+          to_node_id: edge.to,
+          relationship: edge.relationship ?? null,
+        };
+        await databaseService.createConnection(connectionRow);
       }
 
       return { ...mindMap, id, createdAt: new Date(), updatedAt: new Date() };
@@ -132,9 +140,13 @@ export function useUpdateMindMap() {
       id: string;
       updates: Partial<MindMap>;
     }) => {
-      // Update mind map title if provided
-      if (updates.title) {
-        await databaseService.updateMindMap(id, { title: updates.title });
+      // Update mind map title/metadata if provided
+      if (updates.title || updates.central_topic || updates.summary) {
+        await databaseService.updateMindMap(id, {
+          title: updates.title,
+          central_topic: updates.central_topic,
+          summary: updates.summary,
+        });
       }
 
       // Update nodes if provided
@@ -156,9 +168,12 @@ export function useUpdateMindMap() {
           if (existingNodeIds.has(node.id)) {
             // Update existing node
             await databaseService.updateNode(node.id, {
-              text: node.text,
-              position_x: node.position.x,
-              position_y: node.position.y,
+              label: node.label,
+              keywords: JSON.stringify(node.keywords),
+              level: node.level,
+              parent_id: node.parent_id,
+              position_x: node.position?.x,
+              position_y: node.position?.y,
               notes: node.notes ?? null,
             });
           } else {
@@ -166,16 +181,22 @@ export function useUpdateMindMap() {
             await databaseService.createNode({
               id: node.id,
               mindmap_id: id,
-              text: node.text,
-              position_x: node.position.x,
-              position_y: node.position.y,
+              label: node.label,
+              keywords: JSON.stringify(node.keywords),
+              level: node.level,
+              parent_id: node.parent_id,
+              position_x: node.position?.x ?? 0,
+              position_y: node.position?.y ?? 0,
               notes: node.notes ?? null,
             });
           }
         }
+      }
 
-        // Update connections
+      // Update edges if provided
+      if (updates.edges) {
         // First, delete all existing connections for this mind map
+        // (Simpler than diffing for now, can be optimized later)
         const existingConnections =
           await databaseService.getConnectionsForMindMap(id);
         for (const conn of existingConnections) {
@@ -183,15 +204,14 @@ export function useUpdateMindMap() {
         }
 
         // Then create new connections
-        for (const node of updates.nodes) {
-          for (const targetId of node.connections) {
-            await databaseService.createConnection({
-              id: `${node.id}-${targetId}`,
-              mindmap_id: id,
-              from_node_id: node.id,
-              to_node_id: targetId,
-            });
-          }
+        for (const edge of updates.edges) {
+          await databaseService.createConnection({
+            id: `${edge.from}-${edge.to}`,
+            mindmap_id: id,
+            from_node_id: edge.from,
+            to_node_id: edge.to,
+            relationship: edge.relationship ?? null,
+          });
         }
       }
 
@@ -230,10 +250,10 @@ export function useUpdateNode() {
     }: {
       mindMapId: string;
       nodeId: string;
-      updates: Partial<Pick<MindMapNode, "text" | "position">>;
+      updates: Partial<Pick<MindMapNode, "label" | "position">>;
     }) => {
       await databaseService.updateNode(nodeId, {
-        text: updates.text,
+        label: updates.label,
         position_x: updates.position?.x,
         position_y: updates.position?.y,
       });
@@ -266,9 +286,13 @@ export function useCreateNode() {
       await databaseService.createNode({
         id,
         mindmap_id: mindMapId,
-        text: node.text,
-        position_x: node.position.x,
-        position_y: node.position.y,
+        label: node.label,
+        keywords: JSON.stringify(node.keywords),
+        level: node.level,
+        parent_id: node.parent_id,
+        position_x: node.position?.x ?? 0,
+        position_y: node.position?.y ?? 0,
+        notes: node.notes ?? null,
       });
 
       // Update the mind map's updated_at timestamp
@@ -319,10 +343,12 @@ export function useCreateConnection() {
       mindMapId,
       fromNodeId,
       toNodeId,
+      relationship,
     }: {
       mindMapId: string;
       fromNodeId: string;
       toNodeId: string;
+      relationship?: string;
     }) => {
       const id = `${fromNodeId}-${toNodeId}`;
       await databaseService.createConnection({
@@ -330,6 +356,7 @@ export function useCreateConnection() {
         mindmap_id: mindMapId,
         from_node_id: fromNodeId,
         to_node_id: toNodeId,
+        relationship: relationship ?? null,
       });
 
       // Update the mind map's updated_at timestamp

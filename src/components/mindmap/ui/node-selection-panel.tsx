@@ -115,7 +115,7 @@ const NodeSelectionPanel = ({
     // TODO: Display AI response in chat-like interface
     // TODO: Offer options to add AI insights to notes or create new nodes
 
-    console.log("AI Query:", aiQuery, "for node:", selectedNode.text);
+    console.log("AI Query:", aiQuery, "for node:", selectedNode.label);
     setAiQuery("");
     Keyboard.dismiss();
   }, [aiQuery, selectedNode]);
@@ -124,9 +124,9 @@ const NodeSelectionPanel = ({
   const relatedSummary = useMemo(() => {
     if (relatedNodes.length === 0) return null;
     if (relatedNodes.length <= 3) {
-      return relatedNodes.map((n) => n.text).join(", ");
+      return relatedNodes.map((n) => n.label).join(", ");
     }
-    return `${relatedNodes.slice(0, 2).map((n) => n.text).join(", ")} and ${relatedNodes.length - 2} more`;
+    return `${relatedNodes.slice(0, 2).map((n) => n.label).join(", ")} and ${relatedNodes.length - 2} more`;
   }, [relatedNodes]);
 
   if (!selectedNode) return null;
@@ -167,7 +167,7 @@ const NodeSelectionPanel = ({
                     style={{ color: colors.foreground }}
                     numberOfLines={2}
                   >
-                    {selectedNode.text}
+                    {selectedNode.label}
                   </Text>
                   {relatedSummary && (
                     <Text

@@ -21,14 +21,24 @@ export interface LoginResponse {
 export interface MindMapResponse {
   id: string
   title: string
+  central_topic: string
+  summary?: string
   nodes: MindMapNodeResponse[]
+  edges: {
+    from: string
+    to: string
+    relationship?: string
+  }[]
   createdAt: string
   updatedAt: string
 }
 
 export interface MindMapNodeResponse {
   id: string
-  text: string
-  position: { x: number; y: number }
-  connections: string[]
+  label: string
+  keywords: string[]
+  level: number
+  parent_id: string | null
+  position?: { x: number; y: number }
+  notes?: string | null
 }

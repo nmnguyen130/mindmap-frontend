@@ -58,22 +58,12 @@ const MindMapScreen = () => {
   }, []);
 
   const nodeCount = map?.nodes.length ?? 0;
-  const connectionCount = useMemo(() => {
-    if (!map) return 0;
-    return map.nodes.reduce((total: number, node: MindMapNode) => total + node.connections.length, 0);
-  }, [map]);
+  const connectionCount = map?.edges.length ?? 0;
 
   const rootNodes = useMemo(() => {
     if (!map) return [];
-
-    const targets = new Set<string>();
-    map.nodes.forEach((node: MindMapNode) => {
-      node.connections.forEach((targetId: string) => {
-        targets.add(targetId);
-      });
-    });
-
-    return map.nodes.filter((node: MindMapNode) => !targets.has(node.id));
+    // Root nodes are those with no parent_id
+    return map.nodes.filter((node: MindMapNode) => !node.parent_id);
   }, [map]);
 
   const renderStatus = useCallback(
@@ -213,7 +203,7 @@ const MindMapScreen = () => {
                     style={{ color: colors.secondaryForeground }}
                     numberOfLines={1}
                   >
-                    {node.text}
+                    {node.label}
                   </Text>
                 </View>
               ))}
@@ -242,7 +232,7 @@ const MindMapScreen = () => {
 
       <View className="flex-1">
         {map.nodes.length > 0 ? (
-          <Canvas nodes={map.nodes} />
+          <Canvas nodes={map.nodes} edges={map.edges} />
         ) : (
           <View className="flex-1 items-center justify-center px-6">
             <MaterialIcons

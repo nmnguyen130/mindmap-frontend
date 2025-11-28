@@ -7,13 +7,10 @@ import {
 import React from "react";
 import { Platform } from "react-native";
 
+import { MindMapNode } from "@/stores/mindmap";
+
 interface NodeProps {
-  node: {
-    id: string;
-    text: string;
-    position: { x: number; y: number };
-    connections: string[];
-  };
+  node: MindMapNode;
   nodeFillPaint: SkPaint;
   nodeStrokePaint: SkPaint;
   textPaint: SkPaint;
@@ -37,7 +34,7 @@ const Node = ({
 }: NodeProps) => {
   // Calculate text dimensions and node size
   const nodeDimensions = React.useMemo(() => {
-    if (!node.text) {
+    if (!node.label) {
       return {
         width: MIN_WIDTH,
         height: MIN_HEIGHT,
@@ -46,7 +43,7 @@ const Node = ({
       };
     }
 
-    const textMetrics = font.measureText(node.text);
+    const textMetrics = font.measureText(node.label);
     const textWidth = textMetrics.width;
     const textHeight = FONT_SIZE; // Approximate line height
 
@@ -59,7 +56,7 @@ const Node = ({
       textWidth,
       textHeight,
     };
-  }, [node.text]);
+  }, [node.label]);
 
   const {
     width: nodeWidth,
@@ -68,12 +65,14 @@ const Node = ({
     textHeight,
   } = nodeDimensions;
 
+  const position = node.position || { x: 0, y: 0 };
+
   return (
     <React.Fragment>
       {/* Node shadow */}
       <RoundedRect
-        x={node.position.x - nodeWidth / 2 + 2}
-        y={node.position.y - nodeHeight / 2 + 2}
+        x={position.x - nodeWidth / 2 + 2}
+        y={position.y - nodeHeight / 2 + 2}
         width={nodeWidth}
         height={nodeHeight}
         r={nodeHeight / 2}
@@ -83,8 +82,8 @@ const Node = ({
 
       {/* Main node */}
       <RoundedRect
-        x={node.position.x - nodeWidth / 2}
-        y={node.position.y - nodeHeight / 2}
+        x={position.x - nodeWidth / 2}
+        y={position.y - nodeHeight / 2}
         width={nodeWidth}
         height={nodeHeight}
         r={nodeHeight / 2}
@@ -93,8 +92,8 @@ const Node = ({
 
       {/* Node border */}
       <RoundedRect
-        x={node.position.x - nodeWidth / 2}
-        y={node.position.y - nodeHeight / 2}
+        x={position.x - nodeWidth / 2}
+        y={position.y - nodeHeight / 2}
         width={nodeWidth}
         height={nodeHeight}
         r={nodeHeight / 2}
@@ -104,9 +103,9 @@ const Node = ({
 
       {/* Node text */}
       <Text
-        x={node.position.x - textWidth / 2}
-        y={node.position.y + textHeight / 2 - 2} // Adjust for baseline
-        text={node.text}
+        x={position.x - textWidth / 2}
+        y={position.y + textHeight / 2 - 2} // Adjust for baseline
+        text={node.label}
         font={font}
         paint={textPaint}
       />
