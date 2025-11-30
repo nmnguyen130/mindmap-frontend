@@ -3,8 +3,9 @@ import { devtools } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { enableMapSet } from "immer";
 
-import { databaseService } from "@/services/database";
-import { calculateRadialLayout } from "@/utils/mindmap-layout";
+import { databaseService } from "@/shared/database/sqlite-client";
+import { syncService, SyncResult } from "@/features/sync/services/sync-service";
+import { calculateRadialLayout } from "@/features/mindmap/utils/mindmap-layout";
 import {
     generateId,
     dbRowToMindMap,
@@ -14,7 +15,7 @@ import {
     type MindMapEdge,
     type MindmapData,
     type MindMap,
-} from "./helpers/mindmap";
+} from "./mindmap-types";
 
 // Enable Map/Set support in Immer
 enableMapSet();
@@ -33,8 +34,10 @@ interface MindMapState {
     error: string | null;
 
     // Sync state
+    isSyncing: boolean;
     pendingSyncCount: number;
     lastSyncAt: Date | null;
+    lastSyncResult: SyncResult | null;
 
     // Computed getters
     getCurrentMap: () => MindMap | null;
@@ -47,7 +50,7 @@ interface MindMapState {
 
     // Create/Delete operations
     createMap: (data: MindmapData) => Promise<MindMap>;
-    createFromPdf: (id: string, title: string, data: MindmapData) => Promise<void>;
+    createFromPdf: (id: string, title: string, data: MindmapData, documentId?: string) => Promise<void>;
     deleteMap: (id: string) => Promise<void>;
 
     // Update operations - metadata
@@ -73,6 +76,8 @@ interface MindMapState {
 
     // Sync operations
     getSyncStatus: () => Promise<{ pendingChanges: number }>;
+    syncWithBackend: () => Promise<SyncResult>;
+    updateSyncStatus: () => Promise<void>;
 
     // UI helpers
     setCurrentMap: (mapId: string | null) => void;
@@ -91,8 +96,10 @@ export const useMindMapStore = create<MindMapState>()(
             currentMapId: null,
             isLoading: false,
             error: null,
+            isSyncing: false,
             pendingSyncCount: 0,
             lastSyncAt: null,
+            lastSyncResult: null,
 
             // ========================================================================
             // Computed Getters
@@ -247,7 +254,7 @@ export const useMindMapStore = create<MindMapState>()(
                 }
             },
 
-            createFromPdf: async (id: string, title: string, data: MindmapData) => {
+            createFromPdf: async (id: string, title: string, data: MindmapData, documentId?: string) => {
                 set({ isLoading: true, error: null });
                 try {
                     // Apply auto layout
@@ -267,6 +274,7 @@ export const useMindMapStore = create<MindMapState>()(
                             title,
                             central_topic: data.central_topic,
                             summary: data.summary,
+                            document_id: documentId,
                         });
 
                         for (const node of layoutedNodes) {
@@ -283,6 +291,7 @@ export const useMindMapStore = create<MindMapState>()(
                         title,
                         central_topic: data.central_topic,
                         summary: data.summary,
+                        documentId,
                         nodes: layoutedNodes,
                         edges: edgesToSave,
                         createdAt: new Date(),
@@ -674,6 +683,41 @@ export const useMindMapStore = create<MindMapState>()(
                 }
             },
 
+            syncWithBackend: async () => {
+                set({ isSyncing: true });
+
+                try {
+                    const result = await syncService.sync();
+
+                    set({
+                        isSyncing: false,
+                        lastSyncAt: new Date(),
+                        lastSyncResult: result,
+                    });
+
+                    // Reload maps after sync to reflect any remote changes
+                    await get().loadMaps();
+                    await get().updateSyncStatus();
+
+                    return result;
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : String(error);
+                    set({ error: message, isSyncing: false });
+                    throw error;
+                }
+            },
+
+            updateSyncStatus: async () => {
+                try {
+                    const count = await syncService.getPendingChangesCount();
+                    set({ pendingSyncCount: count });
+                } catch (err) {
+                    const message = err instanceof Error ? err.message : String(err);
+                    set({ error: message });
+                    throw err;
+                }
+            },
+
             // ========================================================================
             // UI Helpers
             // ========================================================================
@@ -691,4 +735,4 @@ export const useMindMapStore = create<MindMapState>()(
 );
 
 // Re-export types for convenience
-export type { MindMapNode, MindMapEdge, MindmapData, MindMap } from "./helpers/mindmap";
+export type { MindMapNode, MindMapEdge, MindmapData, MindMap } from "./mindmap-types";

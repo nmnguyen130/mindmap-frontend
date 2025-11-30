@@ -10,9 +10,9 @@ import {
 } from "react-native-safe-area-context";
 
 import { ThemeProvider } from "@/components/providers/theme-provider";
-import { useAuth } from "@/hooks/use-auth";
-import { queryClient } from "@/services/api";
-import { databaseService } from "@/services/database";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { queryClient } from "@/shared/api/client";
+import { databaseService } from "@/shared/database/sqlite-client";
 
 // Initialize database on app start
 databaseService.initialize().catch(console.error);

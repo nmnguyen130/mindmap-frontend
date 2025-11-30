@@ -3,7 +3,7 @@ import { useNavigation } from 'expo-router';
 import { DrawerActions } from '@react-navigation/native';
 
 import Header from '@/components/layout/header';
-import { useAuthStore } from '@/stores/auth';
+import { useAuthStore } from '@/features/auth/store/auth-store';
 import { useTheme } from '@/components/providers/theme-provider';
 
 const ProfileScreen = () => {

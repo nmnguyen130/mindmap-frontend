@@ -5,6 +5,7 @@ export interface MindMapRow {
   title: string;
   central_topic?: string | null;
   summary?: string | null;
+  document_id?: string | null;
   created_at: string;
   updated_at: string;
   // Sync metadata
@@ -86,6 +87,7 @@ class DatabaseService {
           title TEXT NOT NULL,
           central_topic TEXT,
           summary TEXT,
+          document_id TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           is_synced INTEGER DEFAULT 0,
@@ -164,7 +166,7 @@ class DatabaseService {
       // --- MindMaps Triggers ---
       await this.db!.execAsync(`
         CREATE TRIGGER IF NOT EXISTS trg_mindmaps_update_metadata
-        AFTER UPDATE OF title, central_topic, summary, deleted_at ON mindmaps
+        AFTER UPDATE OF title, central_topic, summary, document_id, deleted_at ON mindmaps
         FOR EACH ROW
         WHEN NEW.last_synced_at IS OLD.last_synced_at
         BEGIN
@@ -183,7 +185,7 @@ class DatabaseService {
         END;
 
         CREATE TRIGGER IF NOT EXISTS trg_mindmaps_log_update
-        AFTER UPDATE OF title, central_topic, summary, deleted_at ON mindmaps
+        AFTER UPDATE OF title, central_topic, summary, document_id, deleted_at ON mindmaps
         BEGIN
           INSERT INTO changes (table_name, record_id, operation, changed_at) 
           VALUES (
@@ -273,11 +275,12 @@ class DatabaseService {
     mindMap: Omit<MindMapRow, "created_at" | "updated_at" | "is_synced" | "last_synced_at" | "version" | "deleted_at">
   ): Promise<string> {
     const db = await this.initialize();
-    await db.runAsync("INSERT INTO mindmaps (id, title, central_topic, summary) VALUES (?, ?, ?, ?)", [
+    await db.runAsync("INSERT INTO mindmaps (id, title, central_topic, summary, document_id) VALUES (?, ?, ?, ?, ?)", [
       mindMap.id,
       mindMap.title,
       mindMap.central_topic ?? null,
       mindMap.summary ?? null,
+      mindMap.document_id ?? null,
     ]);
     return mindMap.id;
   }
@@ -299,7 +302,7 @@ class DatabaseService {
 
   async updateMindMap(
     id: string,
-    updates: Partial<Pick<MindMapRow, "title" | "central_topic" | "summary">>
+    updates: Partial<Pick<MindMapRow, "title" | "central_topic" | "summary" | "document_id">>
   ): Promise<void> {
     const db = await this.initialize();
     const setParts: string[] = [];
@@ -316,6 +319,10 @@ class DatabaseService {
     if (updates.summary !== undefined) {
       setParts.push("summary = ?");
       values.push(updates.summary);
+    }
+    if (updates.document_id !== undefined) {
+      setParts.push("document_id = ?");
+      values.push(updates.document_id);
     }
 
     if (setParts.length === 0) return;

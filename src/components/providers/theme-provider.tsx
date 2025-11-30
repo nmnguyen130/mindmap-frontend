@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useColorScheme } from "react-native";
 
-import { databaseService } from "@/services/database";
+import { databaseService } from "@/shared/database/sqlite-client";
 
 export type Theme = "light" | "dark" | "system";
 

@@ -10,7 +10,7 @@ import ActionButton from "@/components/ui/action-button";
 import BottomSheet from "@/components/ui/bottom-sheet";
 import InfoBadge from "@/components/ui/info-badge";
 import { defaultMindMap } from "@/data/default-mindmap";
-import { useMindMapStore, type MindMapNode } from "@/stores/mindmap";
+import { useMindMapStore, type MindMapNode } from "@/features/mindmap/store/mindmap-store";
 
 const MindMapScreen = () => {
   const { id } = useLocalSearchParams<{ id: string }>();

@@ -2,7 +2,7 @@ import { View, Text, Pressable, Alert } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 
-import { useLogin } from '@/hooks/use-auth';
+import { useLogin } from '@/features/auth/hooks/use-auth';
 import { useTheme } from '@/components/providers/theme-provider';
 import FormScreen from '@/components/ui/form-screen';
 import ThemedTextInput from '@/components/ui/text-input';

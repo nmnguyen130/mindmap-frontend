@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Animated } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { Link, router, useNavigation } from 'expo-router';
 import { useEffect, useRef, useMemo } from 'react';
 import { DrawerActions } from '@react-navigation/native';
@@ -6,8 +6,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import Header from '@/components/layout/header';
-import { useMindMapStore } from '@/stores/mindmap';
-import { useAuthStore } from '@/stores/auth';
+import { useMindMapStore } from '@/features/mindmap/store/mindmap-store';
+import { useAuthStore } from '@/features/auth/store/auth-store';
 import { useTheme } from '@/components/providers/theme-provider';
 import ActionButton from '@/components/ui/action-button';
 import StatisticsCard from '@/components/home/statistics-card';
@@ -18,9 +18,6 @@ const HomeScreen = () => {
   const { user, isAuthenticated } = useAuthStore();
   const { colors, isDark } = useTheme();
   const navigation = useNavigation();
-
-  const heroFadeAnim = useRef(new Animated.Value(0)).current;
-  const heroSlideAnim = useRef(new Animated.Value(-20)).current;
 
   // Get maps list from store
   const maps = getMapsList();
@@ -38,22 +35,6 @@ const HomeScreen = () => {
   useEffect(() => {
     loadMaps();
   }, [loadMaps]);
-
-  // Hero animation
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(heroFadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.timing(heroSlideAnim, {
-        toValue: 0,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
 
   const handleCreateMindMap = () => {
     router.push('/mindmap/create');
@@ -90,42 +71,35 @@ const HomeScreen = () => {
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         <View className="pb-5">
           {/* Hero Section with Gradient */}
-          <Animated.View
-            style={{
-              opacity: heroFadeAnim,
-              transform: [{ translateY: heroSlideAnim }],
-            }}
+          <LinearGradient
+            colors={heroGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            className="px-5 pt-6 pb-8 mb-5"
           >
-            <LinearGradient
-              colors={heroGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              className="px-5 pt-6 pb-8 mb-5"
+            <Text
+              className="text-xs font-semibold uppercase mb-2 tracking-wider"
+              style={{ color: 'rgba(255,255,255,0.8)' }}
             >
-              <Text
-                className="text-xs font-semibold uppercase mb-2 tracking-wider"
-                style={{ color: 'rgba(255,255,255,0.8)' }}
-              >
-                {isAuthenticated ? 'Welcome Back' : 'Welcome'}
-              </Text>
+              {isAuthenticated ? 'Welcome Back' : 'Welcome'}
+            </Text>
 
-              <Text
-                className="text-3xl font-bold mb-2"
-                style={{ color: '#ffffff' }}
-              >
-                {isAuthenticated && user?.email
-                  ? user.email.split('@')[0]
-                  : 'Mind Mapping'}
-              </Text>
+            <Text
+              className="text-3xl font-bold mb-2"
+              style={{ color: '#ffffff' }}
+            >
+              {isAuthenticated && user?.email
+                ? user.email.split('@')[0]
+                : 'Mind Mapping'}
+            </Text>
 
-              <Text
-                className="text-sm leading-5"
-                style={{ color: 'rgba(255,255,255,0.9)' }}
-              >
-                Capture, organize, and connect your ideas with powerful AI-assisted mind mapping
-              </Text>
-            </LinearGradient>
-          </Animated.View>
+            <Text
+              className="text-sm leading-5"
+              style={{ color: 'rgba(255,255,255,0.9)' }}
+            >
+              Capture, organize, and connect your ideas with powerful AI-assisted mind mapping
+            </Text>
+          </LinearGradient>
 
           <View className="px-5">
             {/* Statistics Section */}

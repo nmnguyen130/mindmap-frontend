@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
-import { MindMapNode, useMindMapStore } from "@/stores/mindmap";
+import { MindMapNode, useMindMapStore } from "@/features/mindmap/store/mindmap-store";
 
 const StoreManagerScreen = () => {
   const { createMap, loadMaps, maps, isLoading, error, deleteMap } = useMindMapStore();

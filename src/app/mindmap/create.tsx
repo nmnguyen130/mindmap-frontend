@@ -7,8 +7,8 @@ import Header from "@/components/layout/header";
 import FormScreen from "@/components/ui/form-screen";
 import SourceDocumentSection from "@/components/mindmap/create/source-document-section";
 import { useTheme } from "@/components/providers/theme-provider";
-import { useMindMapStore } from "@/stores/mindmap";
-import { useCreateFromPdf } from "@/hooks/use-pdf";
+import { useMindMapStore } from "@/features/mindmap/store/mindmap-store";
+import { useCreateFromPdf } from "@/features/document/hooks/use-pdf-upload";
 
 interface SelectedFile {
   name: string;

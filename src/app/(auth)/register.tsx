@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 
-import { useRegister } from '@/hooks/use-auth';
+import { useRegister } from '@/features/auth/hooks/use-auth';
 import { useTheme } from '@/components/providers/theme-provider';
 import FormScreen from '@/components/ui/form-screen';
 import ThemedTextInput from '@/components/ui/text-input';

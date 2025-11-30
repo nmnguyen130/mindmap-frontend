@@ -1,4 +1,4 @@
-import { MindMapNode, MindmapData } from "@/stores/mindmap";
+import { MindMapNode, MindmapData } from "@/features/mindmap/store/mindmap-store";
 
 interface LayoutNode {
     id: string;

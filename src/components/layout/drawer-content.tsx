@@ -10,7 +10,7 @@ import Animated, {
 
 import { useTheme } from "@/components/providers/theme-provider";
 import ThemeToggle from "@/components/ui/theme-toggle";
-import { useAuthStore } from "@/stores/auth";
+import { useAuthStore } from "@/features/auth/store/auth-store";
 
 type DrawerRouteName = "index" | "explore" | "profile";
 

@@ -1,4 +1,4 @@
-import type { MindMapRow, MindMapNodeRow, ConnectionRow } from "@/services/database";
+import type { MindMapRow, MindMapNodeRow, ConnectionRow } from "@/shared/database/sqlite-client";
 
 // Forward declare types to avoid circular dependency
 export interface MindMapNode {
@@ -28,6 +28,7 @@ export interface MindmapData {
 
 export interface MindMap extends MindmapData {
     id: string;
+    documentId?: string;
     createdAt: Date;
     updatedAt: Date;
     // Sync metadata
@@ -57,6 +58,7 @@ export function dbRowToMindMap(
         title: row.title,
         central_topic: row.central_topic ?? "",
         summary: row.summary ?? undefined,
+        documentId: row.document_id ?? undefined,
         nodes: nodes.map(dbNodeToStoreNode),
         edges: connections.map(dbConnectionToStoreEdge),
         createdAt: new Date(row.created_at),

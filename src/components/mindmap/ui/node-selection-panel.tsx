@@ -14,8 +14,8 @@ import {
 } from "react-native";
 
 import { ThemeColors } from "@/components/providers/theme-provider";
-import { useRagChat } from "@/hooks/use-rag-chat";
-import { MindMapNode, useMindMapStore } from "@/stores/mindmap";
+import { useRagChat } from "@/features/document/hooks/use-rag-chat";
+import { MindMapNode, useMindMapStore } from "@/features/mindmap/store/mindmap-store";
 
 interface NodeSelectionPanelProps {
   selectedNode: MindMapNode | null;

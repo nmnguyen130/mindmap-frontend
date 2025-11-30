@@ -3,8 +3,8 @@ import React, { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
 
 import { useTheme } from "@/components/providers/theme-provider";
-import { useFPSDetection } from "@/hooks/use-fps-detection";
-import { MindMapNode, MindmapData, useMindMapStore } from "@/stores/mindmap";
+import { useFPSDetection } from "@/shared/hooks/use-fps-detection";
+import { MindMapNode, MindmapData, useMindMapStore } from "@/features/mindmap/store/mindmap-store";
 import { getNodeBox } from "@/utils/node-utils";
 
 import FPSOverlay from "../ui/fps-overlay";
