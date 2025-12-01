@@ -3,9 +3,9 @@ import React, { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
 
 import { useTheme } from "@/components/providers/theme-provider";
-import { useFPSDetection } from "@/shared/hooks/use-fps-detection";
 import { MindMapNode, MindmapData, useMindMapStore } from "@/features/mindmap/store/mindmap-store";
-import { getNodeBox } from "@/utils/node-utils";
+import { getNodeBox } from "@/features/mindmap/utils/node-utils";
+import { useFPSDetection } from "@/shared/hooks/use-fps-detection";
 
 import FPSOverlay from "../ui/fps-overlay";
 import NodeSelectionPanel from "../ui/node-selection-panel";
@@ -13,7 +13,7 @@ import NodeSelectionPanel from "../ui/node-selection-panel";
 import Connection from "./connection";
 import GestureHandler from "./gesture-handler";
 import Node from "./node";
-import ViewportCulling, { ViewportVisualization } from "./viewport-culling";
+import ViewportCulling from "./viewport-culling";
 
 interface MobileCanvasProps {
   nodes: MindMapNode[];

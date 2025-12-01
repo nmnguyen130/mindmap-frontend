@@ -40,6 +40,40 @@ export const useRegister = () => {
 };
 
 /**
+ * Hook for forgot password request
+ */
+export const useForgotPassword = () => {
+    return useMutation({
+        mutationFn: authApi.forgotPassword,
+    });
+};
+
+/**
+ * Hook for password reset
+ */
+export const useResetPassword = () => {
+    return useMutation({
+        mutationFn: authApi.resetPassword,
+    });
+};
+
+/**
+ * Hook for Google Sign-In
+ */
+export const useGoogleSignIn = () => {
+    const { setUser, setTokens } = useAuthStore();
+
+    return useMutation({
+        mutationFn: authApi.googleSignIn,
+        onSuccess: async (data) => {
+            await tokenManager.saveTokens(data.access_token, data.refresh_token);
+            setTokens(data.access_token, data.refresh_token);
+            setUser(data.user);
+        },
+    });
+};
+
+/**
  * Main authentication hook
  */
 export const useAuth = () => {

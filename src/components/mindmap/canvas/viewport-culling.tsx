@@ -15,7 +15,7 @@ import {
 import { scheduleOnRN } from "react-native-worklets";
 
 import { MindMapNode } from "@/features/mindmap/store/mindmap-store";
-import { getNodeBox } from "@/utils/node-utils";
+import { getNodeBox } from "@/features/mindmap/utils/node-utils";
 
 interface ViewportCullingProps {
   matrix: SharedValue<Matrix4>;

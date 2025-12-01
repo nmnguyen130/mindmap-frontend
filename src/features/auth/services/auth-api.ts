@@ -28,6 +28,19 @@ export interface User {
     email: string;
 }
 
+export interface ForgotPasswordRequest {
+    email: string;
+}
+
+export interface ResetPasswordRequest {
+    token: string;
+    password: string;
+}
+
+export interface GoogleSignInRequest {
+    idToken: string;
+}
+
 // ============================================================================
 // Auth API Service
 // ============================================================================
@@ -84,4 +97,64 @@ export async function getCurrentUser(accessToken: string): Promise<User> {
 
     const result = await response.json();
     return result.data;
+}
+
+/**
+ * Request password reset email
+ * NOTE: Backend endpoint not yet implemented
+ */
+export async function forgotPassword(data: ForgotPasswordRequest): Promise<{ message: string }> {
+    // TODO: Implement when backend endpoint is ready
+    // const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+    //     method: 'POST',
+    //     headers: { 'Content-Type': 'application/json' },
+    //     body: JSON.stringify(data),
+    // });
+
+    // Placeholder implementation
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve({ message: 'If an account exists with this email, you will receive password reset instructions.' });
+        }, 1000);
+    });
+}
+
+/**
+ * Reset password with token
+ * NOTE: Backend endpoint not yet implemented
+ */
+export async function resetPassword(data: ResetPasswordRequest): Promise<{ message: string }> {
+    // TODO: Implement when backend endpoint is ready
+    // const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+    //     method: 'POST',
+    //     headers: { 'Content-Type': 'application/json' },
+    //     body: JSON.stringify(data),
+    // });
+
+    // Placeholder implementation
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            if (data.token === 'invalid') {
+                reject(new Error('Invalid or expired reset token'));
+            } else {
+                resolve({ message: 'Password has been reset successfully' });
+            }
+        }, 1000);
+    });
+}
+
+/**
+ * Sign in with Google
+ * NOTE: Backend endpoint not yet implemented
+ */
+export async function googleSignIn(data: GoogleSignInRequest): Promise<AuthResponse> {
+    // TODO: Implement when backend Google OAuth is ready
+    // const response = await fetch(`${API_BASE_URL}/api/auth/google`, {
+    //     method: 'POST',
+    //     headers: { 'Content-Type': 'application/json' },
+    //     body: JSON.stringify(data),
+    // });
+
+    // Placeholder - throw error for now
+    throw new Error('Google Sign-In is coming soon! Please use email/password for now.');
 }

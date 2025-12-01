@@ -8,6 +8,8 @@ import { useTheme } from '@/components/providers/theme-provider';
 import FormScreen from '@/components/ui/form-screen';
 import ThemedTextInput from '@/components/ui/text-input';
 import ActionButton from '@/components/ui/action-button';
+import SocialButton from '@/components/ui/social-button';
+import Divider from '@/components/ui/divider';
 
 const RegisterScreen = () => {
     const [email, setEmail] = useState('');
@@ -58,6 +60,14 @@ const RegisterScreen = () => {
         }
     };
 
+    const handleGoogleSignIn = () => {
+        Alert.alert(
+            'Coming Soon!',
+            'Google Sign-In will be available once the backend integration is complete. Please use email/password for now.',
+            [{ text: 'OK' }]
+        );
+    };
+
     const getPasswordStrength = () => {
         if (password.length === 0) return null;
         if (password.length >= 12) return { text: 'Strong', color: colors.success, bars: 3 };
@@ -84,7 +94,7 @@ const RegisterScreen = () => {
                     </Pressable>
 
                     {/* Header */}
-                    <View className="mb-10">
+                    <View className="mb-8">
                         <Text
                             className="text-4xl font-bold mb-2"
                             style={{ color: colors.foreground }}
@@ -95,12 +105,12 @@ const RegisterScreen = () => {
                             className="text-base"
                             style={{ color: colors.mutedForeground }}
                         >
-                            Start creating amazing mind maps
+                            Start organizing your ideas with mind maps
                         </Text>
                     </View>
 
                     {/* Form */}
-                    <View className="mb-6">
+                    <View className="mb-4">
                         <ThemedTextInput
                             label="Email"
                             placeholder="you@example.com"
@@ -145,7 +155,7 @@ const RegisterScreen = () => {
 
                     {/* Password Strength */}
                     {strength && (
-                        <View className="mb-6">
+                        <View className="mb-4">
                             <View className="flex-row gap-1 mb-1">
                                 {[1, 2, 3].map((bar) => (
                                     <View
@@ -172,7 +182,7 @@ const RegisterScreen = () => {
                     />
 
                     {/* Login Link */}
-                    <View className="flex-row justify-center items-center mt-8">
+                    <View className="flex-row justify-center items-center mt-6">
                         <Text style={{ color: colors.mutedForeground }}>
                             Already have an account?{' '}
                         </Text>
@@ -184,6 +194,26 @@ const RegisterScreen = () => {
                                 Sign In
                             </Text>
                         </Pressable>
+                    </View>
+
+                    <Divider />
+
+                    {/* Google Sign-In */}
+                    <View className="mb-3">
+                        <SocialButton
+                            provider="google"
+                            onPress={handleGoogleSignIn}
+                            disabled={register.isPending}
+                        />
+                    </View>
+
+                    {/* Facebook Sign-In */}
+                    <View>
+                        <SocialButton
+                            provider="facebook"
+                            onPress={handleGoogleSignIn}
+                            disabled={register.isPending}
+                        />
                     </View>
                 </View>
             </FormScreen>
