@@ -3,10 +3,6 @@ import { useAuthStore } from '../store/auth-store';
 import * as authApi from '../services/auth-api';
 import * as tokenManager from '../services/token-manager';
 
-// ============================================================================
-// React Hooks for Authentication
-// ============================================================================
-
 /**
  * Hook for user login
  */
@@ -53,18 +49,29 @@ export const useForgotPassword = () => {
  */
 export const useResetPassword = () => {
     return useMutation({
-        mutationFn: authApi.resetPassword,
+        mutationFn: ({ accessToken, password }: { accessToken: string; password: string }) =>
+            authApi.resetPassword(accessToken, password),
     });
 };
 
 /**
- * Hook for Google Sign-In
+ * Hook for social login (Google or Facebook)
  */
-export const useGoogleSignIn = () => {
+export const useSocialLogin = () => {
+    return useMutation({
+        mutationFn: authApi.socialLogin,
+    });
+};
+
+/**
+ * Hook for handling OAuth callback
+ */
+export const useHandleOAuthCallback = () => {
     const { setUser, setTokens } = useAuthStore();
 
     return useMutation({
-        mutationFn: authApi.googleSignIn,
+        mutationFn: ({ accessToken, refreshToken }: { accessToken: string; refreshToken: string }) =>
+            authApi.handleOAuthCallback(accessToken, refreshToken),
         onSuccess: async (data) => {
             await tokenManager.saveTokens(data.access_token, data.refresh_token);
             setTokens(data.access_token, data.refresh_token);
@@ -80,8 +87,14 @@ export const useAuth = () => {
     const store = useAuthStore();
 
     const logout = async () => {
-        await tokenManager.clearTokens();
-        store.logout();
+        try {
+            await authApi.logout();
+        } catch (error) {
+            console.error('Logout API call failed:', error);
+        } finally {
+            await tokenManager.clearTokens();
+            store.logout();
+        }
     };
 
     const initializeAuth = async () => {

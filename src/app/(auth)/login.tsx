@@ -1,8 +1,9 @@
 import { View, Text, Pressable } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 
-import { useLogin } from '@/features/auth/hooks/use-auth';
+import { useLogin, useSocialLogin } from '@/features/auth/hooks/use-auth';
 import { useTheme } from '@/components/providers/theme-provider';
 import { useStatusModal } from '@/components/providers/modal-provider';
 import FormScreen from '@/components/ui/form-screen';
@@ -11,6 +12,9 @@ import ActionButton from '@/components/ui/action-button';
 import SocialButton from '@/components/ui/social-button';
 import Divider from '@/components/ui/divider';
 
+// Set up WebBrowser for OAuth
+WebBrowser.maybeCompleteAuthSession();
+
 const LoginScreen = () => {
   const [email, setEmail] = useState('workflow@example.com');
   const [password, setPassword] = useState('Workflow123!');
@@ -18,6 +22,7 @@ const LoginScreen = () => {
   const { colors } = useTheme();
   const { showStatusModal } = useStatusModal();
   const login = useLogin();
+  const socialLogin = useSocialLogin();
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -42,12 +47,29 @@ const LoginScreen = () => {
     }
   };
 
-  const handleGoogleSignIn = () => {
-    showStatusModal({
-      type: 'info',
-      title: 'Coming Soon!',
-      message: 'Google Sign-In will be available once the backend integration is complete. Please use email/password for now.',
-    });
+  const handleSocialLogin = async (provider: 'google' | 'facebook') => {
+    try {
+      // Get OAuth URL from backend
+      const result = await socialLogin.mutateAsync(provider);
+
+      if (!result.url) {
+        throw new Error('Failed to get OAuth URL');
+      }
+
+      // Open OAuth URL in WebBrowser
+      // The callback will be handled by app/auth/callback.tsx via deep linking
+      await WebBrowser.openAuthSessionAsync(
+        result.url,
+        'mindflow://auth/callback'
+      );
+    } catch (error) {
+      console.error('Social login error:', error);
+      showStatusModal({
+        type: 'error',
+        title: `${provider === 'google' ? 'Google' : 'Facebook'} Sign-In Failed`,
+        message: error instanceof Error ? error.message : 'Authentication failed',
+      });
+    }
   };
 
   return (
@@ -134,12 +156,12 @@ const LoginScreen = () => {
 
           <Divider />
 
-          {/* Google Sign-In at Bottom */}
+          {/* Google Sign-In */}
           <View className="mb-3">
             <SocialButton
               provider="google"
-              onPress={handleGoogleSignIn}
-              disabled={login.isPending}
+              onPress={() => handleSocialLogin('google')}
+              disabled={login.isPending || socialLogin.isPending}
             />
           </View>
 
@@ -147,8 +169,8 @@ const LoginScreen = () => {
           <View>
             <SocialButton
               provider="facebook"
-              onPress={handleGoogleSignIn}
-              disabled={login.isPending}
+              onPress={() => handleSocialLogin('facebook')}
+              disabled={login.isPending || socialLogin.isPending}
             />
           </View>
         </View>

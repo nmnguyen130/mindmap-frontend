@@ -7,10 +7,11 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTheme } from "@/components/providers/theme-provider";
 import ThemeToggle from "@/components/ui/theme-toggle";
-import { useAuthStore } from "@/features/auth/store/auth-store";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 
 type DrawerRouteName = "index" | "explore" | "profile";
 
@@ -84,8 +85,9 @@ const DrawerItem = ({ icon, label, isActive, onPress }: DrawerItemProps) => {
 
 const DrawerContent = (props: DrawerContentComponentProps) => {
   const { colors } = useTheme();
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, logout } = useAuth();
   const { navigation, state } = props;
+  const insets = useSafeAreaInsets();
 
   const handleNavigate = (routeName: DrawerRouteName) => {
     navigation.closeDrawer();
@@ -140,7 +142,7 @@ const DrawerContent = (props: DrawerContentComponentProps) => {
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingVertical: 12 }}
+        contentContainerStyle={{ paddingVertical: 12, flexGrow: 1 }}
       >
         <View className="py-2">
           <Text
@@ -177,26 +179,56 @@ const DrawerContent = (props: DrawerContentComponentProps) => {
         </View>
       </ScrollView>
 
+      {/* Logout Section */}
+      {isAuthenticated && (
+        <View className="px-4 pb-2">
+          <Pressable
+            onPress={logout}
+            className="flex-row items-center justify-center py-3.5 rounded-xl border"
+            style={{
+              backgroundColor: colors.error + "20",
+              borderColor: colors.error + "40",
+            }}
+          >
+            <MaterialIcons
+              name="logout"
+              size={22}
+              color={colors.error}
+              className="mr-2"
+            />
+            <Text
+              className="text-base font-semibold"
+              style={{ color: colors.error }}
+            >
+              Logout
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
       {/* Footer */}
       <View
-        className="flex-row items-center justify-center py-3 px-4 border-t"
+        className="px-4 pt-3 border-t"
         style={{
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
+          paddingBottom: 12 + insets.bottom,
         }}
       >
-        <MaterialIcons
-          name="psychology"
-          size={20}
-          color={colors.primary}
-          className="mr-2"
-        />
-        <Text
-          className="text-xs font-medium"
-          style={{ color: colors.mutedForeground }}
-        >
-          Mind Mapping App v1.0
-        </Text>
+        <View className="flex-row items-center justify-center">
+          <MaterialIcons
+            name="psychology"
+            size={18}
+            color={colors.primary}
+            className="mr-1.5"
+          />
+          <Text
+            className="text-xs"
+            style={{ color: colors.mutedForeground }}
+          >
+            Mind Mapping App v1.0
+          </Text>
+        </View>
       </View>
     </View>
   );

@@ -32,15 +32,6 @@ export interface ForgotPasswordRequest {
     email: string;
 }
 
-export interface ResetPasswordRequest {
-    token: string;
-    password: string;
-}
-
-export interface GoogleSignInRequest {
-    idToken: string;
-}
-
 // ============================================================================
 // Auth API Service
 // ============================================================================
@@ -101,60 +92,89 @@ export async function getCurrentUser(accessToken: string): Promise<User> {
 
 /**
  * Request password reset email
- * NOTE: Backend endpoint not yet implemented
  */
 export async function forgotPassword(data: ForgotPasswordRequest): Promise<{ message: string }> {
-    // TODO: Implement when backend endpoint is ready
-    // const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify(data),
-    // });
-
-    // Placeholder implementation
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            resolve({ message: 'If an account exists with this email, you will receive password reset instructions.' });
-        }, 1000);
+    const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
     });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Failed to send reset email' }));
+        throw new Error(error.message || 'Failed to send reset email');
+    }
+
+    const result = await response.json();
+    return result.data;
 }
 
 /**
- * Reset password with token
- * NOTE: Backend endpoint not yet implemented
+ * Reset password with token from email link
  */
-export async function resetPassword(data: ResetPasswordRequest): Promise<{ message: string }> {
-    // TODO: Implement when backend endpoint is ready
-    // const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify(data),
-    // });
-
-    // Placeholder implementation
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            if (data.token === 'invalid') {
-                reject(new Error('Invalid or expired reset token'));
-            } else {
-                resolve({ message: 'Password has been reset successfully' });
-            }
-        }, 1000);
+export async function resetPassword(accessToken: string, password: string): Promise<{ message: string }> {
+    const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ password }),
     });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Failed to reset password' }));
+        throw new Error(error.message || 'Failed to reset password');
+    }
+
+    const result = await response.json();
+    return result.data;
 }
 
 /**
- * Sign in with Google
- * NOTE: Backend endpoint not yet implemented
+ * Initiate social login (Google or Facebook)
  */
-export async function googleSignIn(data: GoogleSignInRequest): Promise<AuthResponse> {
-    // TODO: Implement when backend Google OAuth is ready
-    // const response = await fetch(`${API_BASE_URL}/api/auth/google`, {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify(data),
-    // });
+export async function socialLogin(provider: 'google' | 'facebook'): Promise<{ url: string }> {
+    const response = await fetch(`${API_BASE_URL}/api/auth/social/${provider}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+    });
 
-    // Placeholder - throw error for now
-    throw new Error('Google Sign-In is coming soon! Please use email/password for now.');
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: `Failed to initiate ${provider} login` }));
+        throw new Error(error.message || `Failed to initiate ${provider} login`);
+    }
+
+    const result = await response.json();
+    return result.data;
+}
+
+/**
+ * Handle OAuth callback - Process tokens from OAuth redirect
+ */
+export async function handleOAuthCallback(accessToken: string, refreshToken: string): Promise<AuthResponse> {
+    // The OAuth flow already provides us with valid tokens from the backend
+    // We just need to fetch the user info with the access token
+    const user = await getCurrentUser(accessToken);
+
+    return {
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        user,
+    };
+}
+
+/**
+ * Logout user
+ */
+export async function logout(): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!response.ok) {
+        // We don't throw here because we want to allow local logout even if server fails
+        console.warn('Server logout failed');
+    }
 }
