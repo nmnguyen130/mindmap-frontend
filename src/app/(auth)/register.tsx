@@ -1,10 +1,11 @@
-import { View, Text, Pressable, Alert } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import { useRegister } from '@/features/auth/hooks/use-auth';
 import { useTheme } from '@/components/providers/theme-provider';
+import { useStatusModal } from '@/components/providers/modal-provider';
 import FormScreen from '@/components/ui/form-screen';
 import ThemedTextInput from '@/components/ui/text-input';
 import ActionButton from '@/components/ui/action-button';
@@ -17,27 +18,28 @@ const RegisterScreen = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const router = useRouter();
     const { colors } = useTheme();
+    const { showStatusModal } = useStatusModal();
     const register = useRegister();
 
     const validateForm = () => {
         if (!email.trim() || !password.trim() || !confirmPassword.trim()) {
-            Alert.alert('Error', 'Please fill in all fields');
+            showStatusModal({ type: 'error', title: 'Error', message: 'Please fill in all fields' });
             return false;
         }
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
-            Alert.alert('Error', 'Please enter a valid email address');
+            showStatusModal({ type: 'error', title: 'Error', message: 'Please enter a valid email address' });
             return false;
         }
 
         if (password.length < 8) {
-            Alert.alert('Error', 'Password must be at least 8 characters long');
+            showStatusModal({ type: 'error', title: 'Error', message: 'Password must be at least 8 characters long' });
             return false;
         }
 
         if (password !== confirmPassword) {
-            Alert.alert('Error', 'Passwords do not match');
+            showStatusModal({ type: 'error', title: 'Error', message: 'Passwords do not match' });
             return false;
         }
 
@@ -49,23 +51,24 @@ const RegisterScreen = () => {
 
         try {
             await register.mutateAsync({ email: email.trim(), password });
-            Alert.alert(
-                'Success',
-                'Account created successfully! Please login.',
-                [{ text: 'OK', onPress: () => router.replace('/login' as any) }]
-            );
+            showStatusModal({
+                type: 'success',
+                title: 'Success',
+                message: 'Account created successfully! Please login.',
+                buttons: [{ text: 'OK', style: 'primary', onPress: () => router.replace('/login' as any) }],
+            });
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Registration failed';
-            Alert.alert('Registration Failed', message);
+            showStatusModal({ type: 'error', title: 'Registration Failed', message });
         }
     };
 
     const handleGoogleSignIn = () => {
-        Alert.alert(
-            'Coming Soon!',
-            'Google Sign-In will be available once the backend integration is complete. Please use email/password for now.',
-            [{ text: 'OK' }]
-        );
+        showStatusModal({
+            type: 'info',
+            title: 'Coming Soon!',
+            message: 'Google Sign-In will be available once the backend integration is complete. Please use email/password for now.',
+        });
     };
 
     const getPasswordStrength = () => {

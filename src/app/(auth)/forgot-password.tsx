@@ -1,10 +1,11 @@
-import { View, Text, Pressable, Alert } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import { useForgotPassword } from '@/features/auth/hooks/use-auth';
 import { useTheme } from '@/components/providers/theme-provider';
+import { useStatusModal } from '@/components/providers/modal-provider';
 import FormScreen from '@/components/ui/form-screen';
 import ThemedTextInput from '@/components/ui/text-input';
 import ActionButton from '@/components/ui/action-button';
@@ -14,17 +15,18 @@ const ForgotPasswordScreen = () => {
     const [submitted, setSubmitted] = useState(false);
     const router = useRouter();
     const { colors } = useTheme();
+    const { showStatusModal } = useStatusModal();
     const forgotPassword = useForgotPassword();
 
     const handleSubmit = async () => {
         if (!email.trim()) {
-            Alert.alert('Error', 'Please enter your email address');
+            showStatusModal({ type: 'error', title: 'Error', message: 'Please enter your email address' });
             return;
         }
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
-            Alert.alert('Error', 'Please enter a valid email address');
+            showStatusModal({ type: 'error', title: 'Error', message: 'Please enter a valid email address' });
             return;
         }
 
@@ -33,7 +35,7 @@ const ForgotPasswordScreen = () => {
             setSubmitted(true);
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to send reset email';
-            Alert.alert('Error', message);
+            showStatusModal({ type: 'error', title: 'Error', message });
         }
     };
 

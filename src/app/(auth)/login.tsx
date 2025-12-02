@@ -1,9 +1,10 @@
-import { View, Text, Pressable, Alert } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 
 import { useLogin } from '@/features/auth/hooks/use-auth';
 import { useTheme } from '@/components/providers/theme-provider';
+import { useStatusModal } from '@/components/providers/modal-provider';
 import FormScreen from '@/components/ui/form-screen';
 import ThemedTextInput from '@/components/ui/text-input';
 import ActionButton from '@/components/ui/action-button';
@@ -15,11 +16,16 @@ const LoginScreen = () => {
   const [password, setPassword] = useState('Workflow123!');
   const router = useRouter();
   const { colors } = useTheme();
+  const { showStatusModal } = useStatusModal();
   const login = useLogin();
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter both email and password');
+      showStatusModal({
+        type: 'error',
+        title: 'Error',
+        message: 'Please enter both email and password',
+      });
       return;
     }
 
@@ -28,16 +34,20 @@ const LoginScreen = () => {
       router.back();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Login failed';
-      Alert.alert('Login Failed', message);
+      showStatusModal({
+        type: 'error',
+        title: 'Login Failed',
+        message,
+      });
     }
   };
 
   const handleGoogleSignIn = () => {
-    Alert.alert(
-      'Coming Soon!',
-      'Google Sign-In will be available once the backend integration is complete. Please use email/password for now.',
-      [{ text: 'OK' }]
-    );
+    showStatusModal({
+      type: 'info',
+      title: 'Coming Soon!',
+      message: 'Google Sign-In will be available once the backend integration is complete. Please use email/password for now.',
+    });
   };
 
   return (

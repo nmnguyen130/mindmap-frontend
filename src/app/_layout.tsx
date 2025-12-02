@@ -10,6 +10,7 @@ import {
 } from "react-native-safe-area-context";
 
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { ModalProvider } from "@/components/providers/modal-provider";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { queryClient } from "@/shared/api/client";
 import { databaseService } from "@/shared/database/sqlite-client";
@@ -30,10 +31,12 @@ const RootLayout = () => {
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>
         <QueryClientProvider client={queryClient}>
           <ThemeProvider>
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
-              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-            </Stack>
+            <ModalProvider>
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
+                <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+              </Stack>
+            </ModalProvider>
           </ThemeProvider>
         </QueryClientProvider>
       </SafeAreaProvider>
