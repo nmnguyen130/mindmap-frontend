@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useMemo, useCallback } from 'react';
 import StatusModal, { StatusButton, StatusType } from '@/components/ui/modal/status-modal';
 
 // Status Modal Types
@@ -14,10 +14,6 @@ interface ModalContextType {
     // Status Modal
     showStatusModal: (options: StatusModalOptions) => void;
     hideStatusModal: () => void;
-
-    // Future: Add other modal types here
-    // showFormModal: (options: FormModalOptions) => void;
-    // showConfirmModal: (options: ConfirmModalOptions) => void;
 }
 
 const ModalContext = createContext<ModalContextType | undefined>(undefined);
@@ -31,20 +27,24 @@ export const ModalProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         message: '',
     });
 
-    // Status Modal Methods
-    const showStatusModal = (options: StatusModalOptions) => {
+    // Memoize modal methods to prevent recreation on every render
+    const showStatusModal = useCallback((options: StatusModalOptions) => {
         setStatusModalOptions(options);
         setStatusModalVisible(true);
-    };
+    }, []);
 
-    const hideStatusModal = () => {
+    const hideStatusModal = useCallback(() => {
         setStatusModalVisible(false);
-    };
+    }, []);
 
-    const value: ModalContextType = {
-        showStatusModal,
-        hideStatusModal,
-    };
+    // Memoize context value to prevent unnecessary re-renders of consumers
+    const value = useMemo<ModalContextType>(
+        () => ({
+            showStatusModal,
+            hideStatusModal,
+        }),
+        [showStatusModal, hideStatusModal]
+    );
 
     return (
         <ModalContext.Provider value={value}>
@@ -59,10 +59,6 @@ export const ModalProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 buttons={statusModalOptions.buttons}
                 onDismiss={hideStatusModal}
             />
-
-            {/* Future: Add other modals here */}
-            {/* <FormModal ... /> */}
-            {/* <ConfirmModal ... /> */}
         </ModalContext.Provider>
     );
 };

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 
-import { useForgotPassword } from '@/features/auth/hooks/use-auth';
+import { useAuth } from '@/features/auth';
 import { useTheme } from '@/components/providers/theme-provider';
 import { useStatusModal } from '@/components/providers/modal-provider';
 import FormScreen from '@/components/ui/form-screen';
@@ -16,7 +16,7 @@ const ForgotPasswordScreen = () => {
     const router = useRouter();
     const { colors } = useTheme();
     const { showStatusModal } = useStatusModal();
-    const forgotPassword = useForgotPassword();
+    const { forgotPassword } = useAuth();
 
     const handleSubmit = async () => {
         if (!email.trim()) {

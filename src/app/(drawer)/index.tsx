@@ -1,66 +1,72 @@
-import { View, Text, ScrollView } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { Link, router, useNavigation } from 'expo-router';
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useMemo, useCallback } from 'react';
 import { DrawerActions } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import Header from '@/components/layout/header';
 import { useMindMapStore } from '@/features/mindmap/store/mindmap-store';
-import { useAuthStore } from '@/features/auth/store/auth-store';
+import { useAuth } from '@/features/auth';
 import { useTheme } from '@/components/providers/theme-provider';
 import ActionButton from '@/components/ui/action-button';
 import StatisticsCard from '@/components/home/statistics-card';
 import MindMapCard from '@/components/home/mindmap-card';
 
+// ============================================================================
+// Component
+// ============================================================================
+
 const HomeScreen = () => {
+  // Direct store access - avoid selectors that return new references
   const { getMapsList, loadMaps, isLoading, error } = useMindMapStore();
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated } = useAuth();
   const { colors, isDark } = useTheme();
   const navigation = useNavigation();
 
-  // Get maps list from store
-  const maps = getMapsList();
+  // Memoize the maps list to avoid recalculating on every render
+  const maps = useMemo(() => getMapsList(), [getMapsList]);
 
-  // Calculate statistics
+  // Calculate statistics with memoization
   const statistics = useMemo(() => {
     const totalMaps = maps.length;
     const totalNodes = maps.reduce((sum, map) => sum + map.nodes.length, 0);
-    // For documents, we'll use 0 for now since RAG is backend only
-    const totalDocuments = 0;
+    const totalDocuments = 0; // RAG is backend only
 
     return { totalMaps, totalNodes, totalDocuments };
   }, [maps]);
 
+  // Load maps on mount
   useEffect(() => {
     loadMaps();
   }, [loadMaps]);
 
-  const handleCreateMindMap = () => {
+  // Memoized handlers
+  const handleCreateMindMap = useCallback(() => {
     router.push('/mindmap/create');
-  };
+  }, []);
 
-  const handleOpenMindMap = (id: string) => {
+  const handleOpenMindMap = useCallback((id: string) => {
     router.push(`/mindmap/${id}`);
-  };
+  }, []);
 
-  const handleOpenDemoMindMap = () => {
+  const handleOpenDemoMindMap = useCallback(() => {
     router.push('/mindmap/default');
-  };
+  }, []);
 
-  const handleMenuPress = () => {
+  const handleMenuPress = useCallback(() => {
     navigation.dispatch(DrawerActions.openDrawer());
-  };
+  }, [navigation]);
 
   // Gradient colors for different themes
   const heroGradient: [string, string] = isDark
-    ? ['#1e3a8a', '#312e81'] // Dark blue gradient
-    : ['#3b82f6', '#8b5cf6']; // Blue to purple
+    ? ['#1e3a8a', '#312e81']
+    : ['#3b82f6', '#8b5cf6'];
 
   const statGradients: [string, string][] = [
-    isDark ? ['#0891b2', '#0e7490'] : ['#06b6d4', '#0891b2'], // Cyan
-    isDark ? ['#7c3aed', '#6d28d9'] : ['#8b5cf6', '#7c3aed'], // Purple
-    isDark ? ['#059669', '#047857'] : ['#10b981', '#059669'], // Green
+    isDark ? ['#0891b2', '#0e7490'] : ['#06b6d4', '#0891b2'],
+    isDark ? ['#7c3aed', '#6d28d9'] : ['#8b5cf6', '#7c3aed'],
+    isDark ? ['#059669', '#047857'] : ['#10b981', '#059669'],
   ];
 
   const accentColors = ['#06b6d4', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981'];
@@ -198,11 +204,7 @@ const HomeScreen = () => {
             {/* Loading State */}
             {isLoading && (
               <View className="items-center py-8">
-                <MaterialIcons
-                  name="hourglass-empty"
-                  size={32}
-                  color={colors.mutedForeground}
-                />
+                <ActivityIndicator size="large" color={colors.primary} />
                 <Text
                   className="text-center mt-3 text-sm"
                   style={{ color: colors.mutedForeground }}

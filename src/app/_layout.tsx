@@ -1,43 +1,64 @@
 import "../global.css";
 
-import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
 import { useEffect } from "react";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-import {
-  SafeAreaProvider,
-  initialWindowMetrics,
-} from "react-native-safe-area-context";
+import { AppState, AppStateStatus } from "react-native";
 
-import { ThemeProvider } from "@/components/providers/theme-provider";
+import { Stack } from "expo-router";
+
+import NetInfo from "@react-native-community/netinfo";
+import { QueryClientProvider, focusManager, onlineManager } from "@tanstack/react-query";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
+
 import { ModalProvider } from "@/components/providers/modal-provider";
-import { useAuth } from "@/features/auth/hooks/use-auth";
+import { ThemeProvider } from "@/components/providers/theme-provider";
+import { AuthProvider } from "@/features/auth";
 import { queryClient } from "@/shared/api/client";
 import { databaseService } from "@/shared/database/sqlite-client";
 
-// Initialize database on app start
+// Initialize database
 databaseService.initialize().catch(console.error);
 
-const RootLayout = () => {
-  const { initializeAuth } = useAuth();
-
-  // Initialize auth on app start to restore user session
+// Online status management
+const useOnlineManager = () => {
   useEffect(() => {
-    initializeAuth();
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      onlineManager.setOnline(state.isConnected ?? false);
+    });
+    return unsubscribe;
   }, []);
+};
+
+// App focus management
+const useAppState = (handler: (status: AppStateStatus) => void) => {
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", handler);
+    return () => subscription.remove();
+  }, [handler]);
+};
+
+const onAppStateChange = (status: AppStateStatus) => {
+  focusManager.setFocused(status === "active");
+};
+
+const RootLayout = () => {
+  useOnlineManager();
+  useAppState(onAppStateChange);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>
         <QueryClientProvider client={queryClient}>
-          <ThemeProvider>
-            <ModalProvider>
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
-                <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-              </Stack>
-            </ModalProvider>
-          </ThemeProvider>
+          <AuthProvider>
+            <ThemeProvider>
+              <ModalProvider>
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="(drawer)" />
+                  <Stack.Screen name="(auth)" />
+                </Stack>
+              </ModalProvider>
+            </ThemeProvider>
+          </AuthProvider>
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

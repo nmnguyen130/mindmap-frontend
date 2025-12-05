@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTheme } from "@/components/providers/theme-provider";
 import ThemeToggle from "@/components/ui/theme-toggle";
-import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useAuth } from "@/features/auth";
 
 type DrawerRouteName = "index" | "explore" | "profile";
 

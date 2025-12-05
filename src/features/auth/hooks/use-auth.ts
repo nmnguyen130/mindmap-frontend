@@ -1,123 +1,127 @@
-import { useMutation } from '@tanstack/react-query';
-import { useAuthStore } from '../store/auth-store';
-import * as authApi from '../services/auth-api';
-import * as tokenManager from '../services/token-manager';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-/**
- * Hook for user login
- */
-export const useLogin = () => {
-    const { setUser, setTokens } = useAuthStore();
+import { authApi, AuthResponse } from "../services/auth-api";
+import {
+  selectAccessToken,
+  selectHasHydrated,
+  selectIsAuthenticated,
+  selectRefreshToken,
+  selectUser,
+  useAuthStore,
+} from "../store/auth-store";
+import { clearTokens, saveTokens } from "../utils/secure-storage";
 
-    return useMutation({
-        mutationFn: authApi.login,
-        onSuccess: async (data) => {
-            await tokenManager.saveTokens(data.access_token, data.refresh_token);
-            setTokens(data.access_token, data.refresh_token);
-            setUser(data.user);
-        },
-    });
+// Stable query keys for caching
+export const authKeys = {
+  all: ["auth"] as const,
+  me: () => [...authKeys.all, "me"] as const,
 };
 
-/**
- * Hook for user registration
- */
-export const useRegister = () => {
-    const { setUser, setTokens } = useAuthStore();
-
-    return useMutation({
-        mutationFn: authApi.register,
-        onSuccess: async (data) => {
-            await tokenManager.saveTokens(data.access_token, data.refresh_token);
-            setTokens(data.access_token, data.refresh_token);
-            setUser(data.user);
-        },
-    });
-};
-
-/**
- * Hook for forgot password request
- */
-export const useForgotPassword = () => {
-    return useMutation({
-        mutationFn: authApi.forgotPassword,
-    });
-};
-
-/**
- * Hook for password reset
- */
-export const useResetPassword = () => {
-    return useMutation({
-        mutationFn: ({ accessToken, password }: { accessToken: string; password: string }) =>
-            authApi.resetPassword(accessToken, password),
-    });
-};
-
-/**
- * Hook for social login (Google or Facebook)
- */
-export const useSocialLogin = () => {
-    return useMutation({
-        mutationFn: authApi.socialLogin,
-    });
-};
-
-/**
- * Hook for handling OAuth callback
- */
-export const useHandleOAuthCallback = () => {
-    const { setUser, setTokens } = useAuthStore();
-
-    return useMutation({
-        mutationFn: ({ accessToken, refreshToken }: { accessToken: string; refreshToken: string }) =>
-            authApi.handleOAuthCallback(accessToken, refreshToken),
-        onSuccess: async (data) => {
-            await tokenManager.saveTokens(data.access_token, data.refresh_token);
-            setTokens(data.access_token, data.refresh_token);
-            setUser(data.user);
-        },
-    });
-};
-
-/**
- * Main authentication hook
+/** 
+ * Main auth hook:
+ * - Zustand for tokens + auth state
+ * - React Query for server user state
+ * - Auto-refetch user on focus/reconnect (global config)
  */
 export const useAuth = () => {
-    const store = useAuthStore();
+  const queryClient = useQueryClient();
 
-    const logout = async () => {
-        try {
-            await authApi.logout();
-        } catch (error) {
-            console.error('Logout API call failed:', error);
-        } finally {
-            await tokenManager.clearTokens();
-            store.logout();
-        }
-    };
+  // Zustand selectors
+  const user = useAuthStore(selectUser);
+  const isAuthenticated = useAuthStore(selectIsAuthenticated);
+  const hasHydrated = useAuthStore(selectHasHydrated);
+  const accessToken = useAuthStore(selectAccessToken);
+  const refreshToken = useAuthStore(selectRefreshToken);
 
-    const initializeAuth = async () => {
-        try {
-            const accessToken = await tokenManager.getAccessToken();
-            const refreshToken = await tokenManager.getRefreshToken();
+  const setAuth = useAuthStore((s) => s.setAuth);
+  const setTokens = useAuthStore((s) => s.setTokens);
+  const logoutStore = useAuthStore((s) => s.logout);
 
-            if (accessToken && refreshToken) {
-                const user = await authApi.getCurrentUser(accessToken);
-                store.setTokens(accessToken, refreshToken);
-                store.setUser(user);
-            }
-        } catch (error) {
-            console.error('Failed to initialize auth:', error);
-            await tokenManager.clearTokens();
-            store.logout();
-        }
-    };
+  // Background user query, enabled only after hydration + token
+  const userQuery = useQuery({
+    queryKey: authKeys.me(),
+    queryFn: () => authApi.getMe({ accessToken: accessToken! }),
+    enabled: !!accessToken && hasHydrated,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: false,
+  });
 
-    return {
-        user: store.user,
-        isAuthenticated: store.isAuthenticated,
-        logout,
-        initializeAuth,
-    };
+  // Login mutation
+  const login = useMutation({
+    mutationFn: authApi.login,
+    onSuccess: async (data: AuthResponse) => {
+      await saveTokens(data.access_token, data.refresh_token);
+      setAuth(data.user, data.access_token, data.refresh_token);
+      queryClient.invalidateQueries({ queryKey: authKeys.all });
+    },
+  });
+
+  // Register mutation
+  const register = useMutation({
+    mutationFn: authApi.register,
+    onSuccess: async (data: AuthResponse) => {
+      await saveTokens(data.access_token, data.refresh_token);
+      setAuth(data.user, data.access_token, data.refresh_token);
+      queryClient.invalidateQueries({ queryKey: authKeys.all });
+    },
+  });
+
+  // Forgot password mutation
+  const forgotPassword = useMutation({
+    mutationFn: authApi.forgotPassword,
+  });
+
+  // Reset password mutation
+  const resetPassword = useMutation({
+    mutationFn: authApi.resetPassword,
+  });
+
+  // Social login mutation (returns OAuth URL)
+  const socialLogin = useMutation({
+    mutationFn: authApi.socialLogin,
+  });
+
+  // OAuth callback mutation (processes tokens + fetches user)
+  const handleOAuthCallback = useMutation({
+    mutationFn: authApi.handleOAuthCallback,
+    onSuccess: async (data: AuthResponse) => {
+      await saveTokens(data.access_token, data.refresh_token);
+      setAuth(data.user, data.access_token, data.refresh_token);
+      queryClient.invalidateQueries({ queryKey: authKeys.all });
+    },
+  });
+
+  // Logout: API call + local cleanup
+  const logout = async () => {
+    try {
+      await authApi.logout();
+    } catch (error) {
+      console.warn("[useAuth] Server logout failed:", error); // Ignore server errors
+    } finally {
+      await clearTokens();
+      logoutStore();
+      queryClient.removeQueries({ queryKey: authKeys.all });
+    }
+  };
+
+  return {
+    // State.
+    user: user ?? userQuery.data, // Fallback to query data (no duplication).
+    isAuthenticated,
+    hasHydrated,
+    isLoading: !hasHydrated || userQuery.isPending,
+    accessToken,
+
+    // Mutations.
+    login,
+    register,
+    forgotPassword,
+    resetPassword,
+    socialLogin,
+    handleOAuthCallback,
+
+    // Actions.
+    logout,
+  };
 };

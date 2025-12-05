@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
 import { useColorScheme } from "react-native";
 
 import { databaseService } from "@/shared/database/sqlite-client";
@@ -138,11 +138,13 @@ export const ThemeProvider = ({
     loadTheme();
   }, []);
 
-  const isDark =
-    theme === "dark" || (theme === "system" && deviceTheme === "dark");
-  const colors = isDark ? darkTheme : lightTheme;
+  const isDark = theme === "dark" || (theme === "system" && deviceTheme === "dark");
 
-  const setTheme = async (newTheme: Theme) => {
+  // Memoize colors to prevent object recreation on every render
+  const colors = useMemo(() => (isDark ? darkTheme : lightTheme), [isDark]);
+
+  // Memoize setTheme to prevent recreation
+  const setTheme = useCallback(async (newTheme: Theme) => {
     setThemeState(newTheme);
     // Save to SQLite
     try {
@@ -151,18 +153,21 @@ export const ThemeProvider = ({
         "INSERT OR REPLACE INTO settings (key, value) VALUES ('theme', ?)",
         [newTheme]
       );
-      // console.log("Theme saved to database:", newTheme);
     } catch (error) {
       console.error("Could not save theme to database:", error);
     }
-  };
+  }, []);
 
-  const value = {
-    theme,
-    colors,
-    setTheme,
-    isDark,
-  };
+  // Memoize context value to prevent unnecessary re-renders of consumers
+  const value = useMemo(
+    () => ({
+      theme,
+      colors,
+      setTheme,
+      isDark,
+    }),
+    [theme, colors, setTheme, isDark]
+  );
 
   // Don't render children until theme is loaded
   if (isLoading) {

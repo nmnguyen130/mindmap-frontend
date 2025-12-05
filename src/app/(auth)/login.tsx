@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 
-import { useLogin, useSocialLogin } from '@/features/auth/hooks/use-auth';
+import { useAuth } from '@/features/auth';
 import { useTheme } from '@/components/providers/theme-provider';
 import { useStatusModal } from '@/components/providers/modal-provider';
 import FormScreen from '@/components/ui/form-screen';
@@ -16,13 +16,12 @@ import Divider from '@/components/ui/divider';
 WebBrowser.maybeCompleteAuthSession();
 
 const LoginScreen = () => {
-  const [email, setEmail] = useState('workflow@example.com');
-  const [password, setPassword] = useState('Workflow123!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const router = useRouter();
   const { colors } = useTheme();
   const { showStatusModal } = useStatusModal();
-  const login = useLogin();
-  const socialLogin = useSocialLogin();
+  const { login, socialLogin } = useAuth();
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -47,10 +46,10 @@ const LoginScreen = () => {
     }
   };
 
-  const handleSocialLogin = async (provider: 'google' | 'facebook') => {
+  const handleSocialLogin = async ({ provider }: { provider: "google" | "facebook" }) => {
     try {
       // Get OAuth URL from backend
-      const result = await socialLogin.mutateAsync(provider);
+      const result = await socialLogin.mutateAsync({ provider });
 
       if (!result.url) {
         throw new Error('Failed to get OAuth URL');
@@ -160,7 +159,7 @@ const LoginScreen = () => {
           <View className="mb-3">
             <SocialButton
               provider="google"
-              onPress={() => handleSocialLogin('google')}
+              onPress={() => handleSocialLogin({ provider: 'google' })}
               disabled={login.isPending || socialLogin.isPending}
             />
           </View>
@@ -169,7 +168,7 @@ const LoginScreen = () => {
           <View>
             <SocialButton
               provider="facebook"
-              onPress={() => handleSocialLogin('facebook')}
+              onPress={() => handleSocialLogin({ provider: 'facebook' })}
               disabled={login.isPending || socialLogin.isPending}
             />
           </View>

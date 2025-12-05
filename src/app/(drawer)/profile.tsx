@@ -3,11 +3,12 @@ import { useNavigation } from 'expo-router';
 import { DrawerActions } from '@react-navigation/native';
 
 import Header from '@/components/layout/header';
-import { useAuthStore } from '@/features/auth/store/auth-store';
+import { useAuth } from '@/features/auth';
 import { useTheme } from '@/components/providers/theme-provider';
 
 const ProfileScreen = () => {
-  const { user, isAuthenticated, logout } = useAuthStore();
+  // Use proper selectors for Zustand - avoid anti-pattern
+  const { user, isAuthenticated, logout } = useAuth();
   const { colors } = useTheme();
   const navigation = useNavigation();
 
@@ -36,7 +37,7 @@ const ProfileScreen = () => {
               className="text-lg mb-2"
               style={{ color: colors.foreground }}
             >
-              Welcome, {user.name || user.email}
+              Welcome, {user.email.split('@')[0]}
             </Text>
             <Text
               className="mb-6"

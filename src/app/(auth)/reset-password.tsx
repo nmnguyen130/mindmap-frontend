@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useResetPassword } from '@/features/auth/hooks/use-auth';
+import { useAuth } from '@/features/auth';
 import { Ionicons } from '@expo/vector-icons';
 
 /**
@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 export default function ResetPasswordScreen() {
     const params = useLocalSearchParams();
     const router = useRouter();
-    const resetPassword = useResetPassword();
+    const { resetPassword } = useAuth();
 
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');

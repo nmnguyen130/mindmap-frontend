@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 
-import { useRegister } from '@/features/auth/hooks/use-auth';
+import { useAuth } from '@/features/auth';
 import { useTheme } from '@/components/providers/theme-provider';
 import { useStatusModal } from '@/components/providers/modal-provider';
 import FormScreen from '@/components/ui/form-screen';
@@ -19,7 +19,7 @@ const RegisterScreen = () => {
     const router = useRouter();
     const { colors } = useTheme();
     const { showStatusModal } = useStatusModal();
-    const register = useRegister();
+    const { register } = useAuth();
 
     const validateForm = () => {
         if (!email.trim() || !password.trim() || !confirmPassword.trim()) {

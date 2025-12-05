@@ -1,13 +1,20 @@
-// Re-export all auth functionality
-export { useAuth, useLogin, useRegister } from './hooks/use-auth';
-export { useAuthStore } from './store/auth-store';
-export * as authApi from './services/auth-api';
-export * as tokenManager from './services/token-manager';
+// Hooks
+export { useAuth } from "./hooks/use-auth";
 
-// Re-export types
-export type { User } from './store/auth-store';
-export type {
-    AuthResponse,
-    LoginRequest,
-    RegisterRequest
-} from './services/auth-api';
+// Providers
+export { AuthProvider } from "./providers/auth-provider";
+
+// API services
+export { authApi } from "./services/auth-api";
+
+// Query / Mutation keys
+export { authKeys } from "./hooks/use-auth";
+
+// State store
+export { useAuthStore } from "./store/auth-store";
+
+// Types
+export type { User } from "./store/auth-store";
+
+// Utilities
+export { clearTokens, saveTokens } from "./utils/secure-storage";
