@@ -6,7 +6,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import Header from '@/components/layout/header';
-import { useMindMapStore } from '@/features/mindmap/store/mindmap-store';
+import { useMindmaps, fullMindmapToUI } from '@/features/mindmap';
 import { useAuth } from '@/features/auth';
 import { useTheme } from '@/components/providers/theme-provider';
 import ActionButton from '@/components/ui/action-button';
@@ -18,28 +18,36 @@ import MindMapCard from '@/components/home/mindmap-card';
 // ============================================================================
 
 const HomeScreen = () => {
-  // Direct store access - avoid selectors that return new references
-  const { getMapsList, loadMaps, isLoading, error } = useMindMapStore();
+  // TanStack Query hook - reads from SQLite
+  const { data: mindmapRows = [], isLoading, error, refetch } = useMindmaps();
   const { user, isAuthenticated } = useAuth();
   const { colors, isDark } = useTheme();
   const navigation = useNavigation();
 
-  // Memoize the maps list to avoid recalculating on every render
-  const maps = useMemo(() => getMapsList(), [getMapsList]);
+  // Convert DB rows to UI-friendly format
+  const maps = useMemo(() => 
+    mindmapRows.map(row => ({
+      id: row.id,
+      title: row.title,
+      updatedAt: new Date(row.updated_at),
+      nodeCount: 0, // We don't load nodes for list view
+    })),
+    [mindmapRows]
+  );
 
   // Calculate statistics with memoization
   const statistics = useMemo(() => {
-    const totalMaps = maps.length;
-    const totalNodes = maps.reduce((sum, map) => sum + map.nodes.length, 0);
-    const totalDocuments = 0; // RAG is backend only
-
-    return { totalMaps, totalNodes, totalDocuments };
+    return {
+      totalMaps: maps.length,
+      totalNodes: 0, // Not loaded in list view for performance
+      totalDocuments: 0,
+    };
   }, [maps]);
 
   // Load maps on mount
   useEffect(() => {
-    loadMaps();
-  }, [loadMaps]);
+    void refetch();
+  }, [refetch]);
 
   // Memoized handlers
   const handleCreateMindMap = useCallback(() => {
@@ -229,7 +237,7 @@ const HomeScreen = () => {
                   className="flex-1 ml-3 text-sm"
                   style={{ color: colors.error }}
                 >
-                  {error}
+                  {error instanceof Error ? error.message : String(error)}
                 </Text>
               </View>
             )}
@@ -305,7 +313,7 @@ const HomeScreen = () => {
                         key={map.id}
                         id={map.id}
                         title={map.title}
-                        nodeCount={map.nodes.length}
+                        nodeCount={map.nodeCount}
                         updatedAt={map.updatedAt}
                         accentColor={accentColors[index % accentColors.length]}
                         onPress={() => handleOpenMindMap(map.id)}

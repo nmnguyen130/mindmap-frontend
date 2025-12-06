@@ -1,4 +1,4 @@
-import { MindMap } from "@/features/mindmap/store/mindmap-store";
+import type { MindMap } from "@/features/mindmap/types";
 
 export const defaultMindMap: MindMap = {
   id: "default-demo",
@@ -14,17 +14,16 @@ export const defaultMindMap: MindMap = {
       level: 0,
       parent_id: null,
       position: { x: 400, y: 300 },
-      notes:
-        "This is the central idea of the demo map. Imagine it as the main topic or chapter of your document.",
+      notes: "This is the central idea of the demo map.",
     },
     {
       id: "node-1",
-      label: "Concept 1 and concep 2",
-      keywords: ["concept 1", "concept 2"],
+      label: "Concept 1",
+      keywords: ["concept 1"],
       level: 1,
       parent_id: "central-node",
       position: { x: 200, y: 150 },
-      notes: "High-level summary for concept 1. Replace this with your own notes from the source.",
+      notes: "High-level summary for concept 1.",
     },
     {
       id: "node-2",
@@ -93,14 +92,14 @@ export const defaultMindMap: MindMap = {
     },
   ],
   edges: [
-    { from: "central-node", to: "node-1" },
-    { from: "central-node", to: "node-2" },
-    { from: "central-node", to: "node-3" },
-    { from: "central-node", to: "node-4" },
-    { from: "node-1", to: "node-1-1" },
-    { from: "node-1", to: "node-1-2" },
-    { from: "node-2", to: "node-2-1" },
-    { from: "node-3", to: "node-3-1" },
-    { from: "node-3", to: "node-3-2" },
+    { id: "e1", from: "central-node", to: "node-1" },
+    { id: "e2", from: "central-node", to: "node-2" },
+    { id: "e3", from: "central-node", to: "node-3" },
+    { id: "e4", from: "central-node", to: "node-4" },
+    { id: "e5", from: "node-1", to: "node-1-1" },
+    { id: "e6", from: "node-1", to: "node-1-2" },
+    { id: "e7", from: "node-2", to: "node-2-1" },
+    { id: "e8", from: "node-3", to: "node-3-1" },
+    { id: "e9", from: "node-3", to: "node-3-2" },
   ],
 };

@@ -1,11 +1,20 @@
-// Re-export all mindmap functionality
-export { useMindMapStore } from './store/mindmap-store';
-export { calculateRadialLayout } from './utils/mindmap-layout';
+// Hooks (TanStack Query)
+export { useMindmaps, useMindmap, mindmapKeys } from "./hooks/use-mindmaps";
 
-// Re-export types
-export type {
-    MindMap,
-    MindMapNode,
-    MindMapEdge,
-    MindmapData
-} from './store/mindmap-types';
+// UI Store
+export {
+  useMindmapUI,
+  selectCurrentMapId,
+  selectSelectedNodeIds,
+  selectIsEditing,
+  selectEditingNodeId,
+} from "./store/mindmap-ui-store";
+
+// Utils
+export {
+  calculateRadialLayout,
+  calculateCompactRadialLayout,
+} from "./utils/mindmap-layout";
+
+// Types
+export * from "./types";
