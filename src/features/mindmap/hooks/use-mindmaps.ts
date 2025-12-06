@@ -38,6 +38,7 @@ interface CreateMindmapData {
     relationship?: string;
   }>;
 }
+
 interface AddNodeData {
   id: string;
   mindmap_id: string;
@@ -47,6 +48,7 @@ interface AddNodeData {
   position_x: number;
   position_y: number;
 }
+
 interface UpdateNodeData {
   id: string;
   mindmapId: string;
@@ -234,6 +236,35 @@ export function useMindmap(id: string | null) {
     },
   });
 
+  // Connection: add
+  const addConnection = useMutation({
+    mutationFn: async (conn: {
+      id: string;
+      from_node_id: string;
+      to_node_id: string;
+      relationship?: string;
+    }) => {
+      if (!id) throw new Error("No mindmap id");
+      await connectionQueries.create({ ...conn, mindmap_id: id });
+      return conn;
+    },
+    onSuccess: () => {
+      if (id)
+        queryClient.invalidateQueries({ queryKey: mindmapKeys.detail(id) });
+    },
+  });
+
+  // Connection: delete
+  const deleteConnection = useMutation({
+    mutationFn: async (connectionId: string) => {
+      await connectionQueries.softDelete(connectionId);
+    },
+    onSuccess: () => {
+      if (id)
+        queryClient.invalidateQueries({ queryKey: mindmapKeys.detail(id) });
+    },
+  });
+
   return {
     // State
     data: detailQuery.data,
@@ -249,6 +280,10 @@ export function useMindmap(id: string | null) {
     updateNode,
     addNode,
     deleteNode,
+
+    // Connection mutations
+    addConnection,
+    deleteConnection,
 
     // Utilities
     refetch: detailQuery.refetch,

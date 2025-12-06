@@ -6,6 +6,13 @@ export type {
   FullMindMap,
 } from "@/shared/database";
 
+// Import for internal use
+import type {
+  MindMapNodeRow,
+  ConnectionRow,
+  FullMindMap,
+} from "@/shared/database";
+
 // UI-friendly types (for components that don't need raw DB types)
 
 export interface MindMapNode {
@@ -79,10 +86,3 @@ export function fullMindmapToUI(full: FullMindMap): MindMap {
     edges: full.connections.map(dbRowToMindMapEdge),
   };
 }
-
-// Import for internal use
-import type {
-  MindMapNodeRow,
-  ConnectionRow,
-  FullMindMap,
-} from "@/shared/database";
