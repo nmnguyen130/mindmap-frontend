@@ -1,7 +1,14 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import { useColorScheme } from "react-native";
 
-import { databaseService } from "@/shared/database/sqlite-client";
+import { getDB } from "@/shared/database";
 
 export type Theme = "light" | "dark" | "system";
 
@@ -122,7 +129,7 @@ export const ThemeProvider = ({
   useEffect(() => {
     async function loadTheme() {
       try {
-        const db = await databaseService.initialize();
+        const db = await getDB();
         const result = await db.getFirstAsync<{ value: string }>(
           "SELECT value FROM settings WHERE key = 'theme'"
         );
@@ -138,7 +145,8 @@ export const ThemeProvider = ({
     loadTheme();
   }, []);
 
-  const isDark = theme === "dark" || (theme === "system" && deviceTheme === "dark");
+  const isDark =
+    theme === "dark" || (theme === "system" && deviceTheme === "dark");
 
   // Memoize colors to prevent object recreation on every render
   const colors = useMemo(() => (isDark ? darkTheme : lightTheme), [isDark]);
@@ -148,7 +156,7 @@ export const ThemeProvider = ({
     setThemeState(newTheme);
     // Save to SQLite
     try {
-      const db = await databaseService.initialize();
+      const db = await getDB();
       await db.runAsync(
         "INSERT OR REPLACE INTO settings (key, value) VALUES ('theme', ?)",
         [newTheme]

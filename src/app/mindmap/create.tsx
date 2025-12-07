@@ -7,7 +7,7 @@ import Header from "@/components/layout/header";
 import FormScreen from "@/components/ui/form-screen";
 import SourceDocumentSection from "@/components/mindmap/create/source-document-section";
 import { useTheme } from "@/components/providers/theme-provider";
-import { useMindMapStore } from "@/features/mindmap/store/mindmap-store";
+import { useMindmaps } from "@/features/mindmap";
 import { useCreateFromPdf } from "@/features/document/hooks/use-pdf-upload";
 
 interface SelectedFile {
@@ -27,7 +27,7 @@ const CreateMindMapScreen = () => {
   const [title, setTitle] = useState("");
   const [documentUrl, setDocumentUrl] = useState("");
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
-  const { isLoading, createFromPdf: createFromPdfStore, createMap } = useMindMapStore();
+  const { create, isLoading } = useMindmaps();
   const { colors } = useTheme();
   const createFromPdf = useCreateFromPdf();
 
@@ -73,7 +73,7 @@ const CreateMindMapScreen = () => {
           file: {
             uri: selectedFile.uri,
             name: selectedFile.name,
-            type: selectedFile.mimeType || 'application/pdf',
+            type: selectedFile.mimeType || "application/pdf",
           },
           title: trimmedTitle,
           generateMindmap: true,
@@ -82,60 +82,82 @@ const CreateMindMapScreen = () => {
         // Store mindmap from backend response
         if (result.mindmap) {
           // Ensure edges have IDs (backend might not include them)
-          const transformedData = {
-            ...result.mindmap.mindmap_data,
-            edges: result.mindmap.mindmap_data.edges.map((edge: any) => ({
+          const transformedEdges = result.mindmap.mindmap_data.edges.map(
+            (edge: any) => ({
               ...edge,
               id: edge.id || `edge-${Date.now()}-${Math.random()}`,
-            })),
-          };
-
-          await createFromPdfStore(
-            result.mindmap.id,
-            result.mindmap.title,
-            transformedData
+            })
           );
+          // Transform nodes to expected format (backend may use different structure)
+          const transformedNodes = result.mindmap.mindmap_data.nodes.map(
+            (node: any) => ({
+              id: node.id,
+              label: node.label,
+              keywords: node.keywords,
+              level: node.level ?? 0,
+              parent_id: node.parent_id,
+              position: node.position ?? { x: node.x ?? 0, y: node.y ?? 0 },
+              notes: node.notes,
+            })
+          );
+
+          await create.mutateAsync({
+            id: result.mindmap.id,
+            title: result.mindmap.title,
+            central_topic: result.mindmap.mindmap_data.central_topic,
+            summary: result.mindmap.mindmap_data.summary,
+            nodes: transformedNodes,
+            edges: transformedEdges,
+          });
           router.push(`/mindmap/${result.mindmap.id}`);
         } else {
-          Alert.alert('Error', 'Backend did not generate a mindmap. Please try again.');
+          Alert.alert(
+            "Error",
+            "Backend did not generate a mindmap. Please try again."
+          );
         }
       } else {
         // Flow B: Without PDF - Create blank mindmap locally
-        const blankMindmapData = {
+        const newId = crypto.randomUUID();
+        const rootNodeId = `node-${Date.now()}`;
+
+        await create.mutateAsync({
+          id: newId,
           title: trimmedTitle,
           central_topic: trimmedTitle,
-          summary: '',
+          summary: "",
           nodes: [
             {
-              id: `node-${Date.now()}`,
+              id: rootNodeId,
               label: trimmedTitle,
               level: 0,
-              parent_id: null,
+              parent_id: undefined,
               keywords: [],
               position: { x: 0, y: 0 },
-              notes: null,
-            }
+              notes: undefined,
+            },
           ],
           edges: [],
-        };
+        });
 
-        const createdMap = await createMap(blankMindmapData);
-        router.push(`/mindmap/${createdMap.id}`);
+        router.push(`/mindmap/${newId}`);
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create mindmap';
+      const message =
+        error instanceof Error ? error.message : "Failed to create mindmap";
       console.error("Mindmap creation failed:", error);
-      Alert.alert('Creation Failed', message);
+      Alert.alert("Creation Failed", message);
     }
   };
 
-  const canSubmit = title.trim().length > 0 && !isLoading && !createFromPdf.isPending;
+  const canSubmit =
+    title.trim().length > 0 && !isLoading && !createFromPdf.isPending;
 
   return (
     <View className="flex-1" style={{ backgroundColor: colors.background }}>
       <Header
         title="Create Mind Map"
-        onMenuPress={() => { }}
+        onMenuPress={() => {}}
         showBackButton
         onBackPress={handleBackPress}
       />
@@ -153,11 +175,9 @@ const CreateMindMapScreen = () => {
           >
             Create a new mind map
           </Text>
-          <Text
-            className="text-sm"
-            style={{ color: colors.mutedForeground }}
-          >
-            Give your mind map a clear title. Optionally attach a PDF document to generate AI-powered content.
+          <Text className="text-sm" style={{ color: colors.mutedForeground }}>
+            Give your mind map a clear title. Optionally attach a PDF document
+            to generate AI-powered content.
           </Text>
         </View>
 
@@ -205,7 +225,11 @@ const CreateMindMapScreen = () => {
               className="text-base font-semibold"
               style={{ color: colors.primaryForeground }}
             >
-              {createFromPdf.isPending ? "Uploading..." : isLoading ? "Creating..." : "Create mind map"}
+              {createFromPdf.isPending
+                ? "Uploading..."
+                : isLoading
+                  ? "Creating..."
+                  : "Create mind map"}
             </Text>
           </Pressable>
         </View>

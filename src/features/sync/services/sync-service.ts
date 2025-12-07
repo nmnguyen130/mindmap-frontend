@@ -2,12 +2,13 @@ import { changeQueries, mindmapQueries } from "@/shared/database";
 import type { ChangeRow } from "@/shared/database";
 import { API_BASE_URL } from "@/constants/config";
 import { getDB } from "@/shared/database/client";
+import type { ConflictItem } from "../store/sync-store";
 
 export interface SyncResult {
   success: boolean;
   synced: number;
   failed: number;
-  conflicts: number;
+  conflicts: ConflictItem[];
 }
 
 /**
@@ -23,30 +24,30 @@ class SyncService {
    */
   async sync(accessToken: string): Promise<SyncResult> {
     if (this.isSyncing || !accessToken) {
-      return { success: false, synced: 0, failed: 0, conflicts: 0 };
+      return { success: false, synced: 0, failed: 0, conflicts: [] };
     }
 
     this.isSyncing = true;
     let synced = 0;
     let failed = 0;
-    let conflicts = 0;
+    let conflictItems: ConflictItem[] = [];
 
     try {
       // Push local changes
       const pushResult = await this.pushChanges(accessToken);
       synced += pushResult.synced;
       failed += pushResult.failed;
-      conflicts += pushResult.conflicts;
+      conflictItems.push(...pushResult.conflicts);
 
       // Pull remote changes
       const pullResult = await this.pullChanges(accessToken);
       synced += pullResult.synced;
-      conflicts += pullResult.conflicts;
+      conflictItems.push(...pullResult.conflicts);
 
-      return { success: true, synced, failed, conflicts };
+      return { success: true, synced, failed, conflicts: conflictItems };
     } catch (error) {
       console.error("[Sync] Error:", error);
-      return { success: false, synced, failed, conflicts };
+      return { success: false, synced, failed, conflicts: conflictItems };
     } finally {
       this.isSyncing = false;
     }
@@ -57,36 +58,100 @@ class SyncService {
     const changes = await changeQueries.getPending();
     let synced = 0;
     let failed = 0;
-    let conflicts = 0;
+    const conflictItems: ConflictItem[] = [];
 
     // Group by table for efficient processing
     const grouped = this.groupByTable(changes);
+    const mindmapChanges = grouped["mindmaps"] || [];
 
-    for (const [table, tableChanges] of Object.entries(grouped)) {
-      for (const change of tableChanges) {
-        try {
-          await this.pushSingleChange(table, change, accessToken);
-          synced++;
-        } catch (error: any) {
-          if (error.status === 409) {
-            conflicts++;
-          } else {
-            failed++;
-            console.error(
-              `[Sync] Push failed for ${table}:${change.record_id}`,
-              error
-            );
+    // Batch load all mindmaps that need syncing (optimization)
+    const mindmapIdsToSync = mindmapChanges
+      .filter((c) => c.operation !== "DELETE")
+      .map((c) => c.record_id);
+    const mindmapsToSync = await mindmapQueries.getByIds(mindmapIdsToSync);
+    const mindmapMap = new Map(mindmapsToSync.map((m) => [m.mindMap.id, m]));
+
+    // Process mindmap changes with pre-loaded data
+    for (const change of mindmapChanges) {
+      try {
+        if (change.operation === "DELETE") {
+          await this.deleteOnBackend(change.record_id, accessToken);
+        } else {
+          const fullMindmap = mindmapMap.get(change.record_id);
+          if (fullMindmap) {
+            await this.upsertOnBackendWithData(fullMindmap, accessToken);
           }
+        }
+        synced++;
+      } catch (error: any) {
+        if (error.status === 409) {
+          // Conflict detected during push - will be resolved during pull
+        } else {
+          failed++;
+          console.error(
+            `[Sync] Push failed for mindmaps:${change.record_id}`,
+            error
+          );
         }
       }
     }
 
     // Mark all as synced after successful push
     if (synced > 0) {
-      await changeQueries.markAsSynced(changes.slice(0, synced));
+      await changeQueries.markAsSynced(mindmapChanges.slice(0, synced));
     }
 
-    return { success: true, synced, failed, conflicts };
+    return { success: true, synced, failed, conflicts: conflictItems };
+  }
+
+  // Upsert with pre-loaded data (optimization - no extra DB query)
+  private async upsertOnBackendWithData(
+    fullMindmap: { mindMap: any; nodes: any[]; connections: any[] },
+    accessToken: string
+  ): Promise<void> {
+    const id = fullMindmap.mindMap.id;
+    const exists = await this.existsOnBackend(id, accessToken);
+    const method = exists ? "PUT" : "POST";
+    const url = exists
+      ? `${API_BASE_URL}/api/mindmaps/${id}`
+      : `${API_BASE_URL}/api/mindmaps`;
+
+    const response = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        id: fullMindmap.mindMap.id,
+        title: fullMindmap.mindMap.title,
+        central_topic: fullMindmap.mindMap.central_topic,
+        summary: fullMindmap.mindMap.summary,
+        document_id: fullMindmap.mindMap.document_id,
+        version: fullMindmap.mindMap.version,
+        nodes: fullMindmap.nodes.map((n) => ({
+          id: n.id,
+          label: n.label,
+          keywords: n.keywords ? JSON.parse(n.keywords) : [],
+          level: n.level,
+          parent_id: n.parent_id,
+          position: { x: n.position_x, y: n.position_y },
+          notes: n.notes,
+        })),
+        connections: fullMindmap.connections.map((c) => ({
+          id: c.id,
+          from: c.from_node_id,
+          to: c.to_node_id,
+          relationship: c.relationship,
+        })),
+      }),
+    });
+
+    if (!response.ok) {
+      const error: any = new Error("Push failed");
+      error.status = response.status;
+      throw error;
+    }
   }
 
   private async pushSingleChange(
@@ -186,7 +251,7 @@ class SyncService {
   // Pull remote changes from backend
   private async pullChanges(accessToken: string): Promise<SyncResult> {
     let synced = 0;
-    let conflicts = 0;
+    const conflictItems: ConflictItem[] = [];
 
     try {
       const lastSync = await changeQueries.getLastSyncTimestamp();
@@ -215,16 +280,25 @@ class SyncService {
           await this.updateFromRemote(remote);
           synced++;
         } else if (!local.is_synced && remote.version === local.version) {
-          // Conflict: both modified
-          conflicts++;
+          // Conflict: both local and remote modified
+          conflictItems.push({
+            id: remote.id,
+            table: "mindmaps",
+            localVersion: local.version,
+            remoteVersion: remote.version,
+            localTitle: local.title,
+            remoteTitle: remote.title,
+            localUpdatedAt: local.updated_at,
+            remoteUpdatedAt: remote.updated_at,
+          });
         }
       }
 
       await changeQueries.setLastSyncTimestamp(Date.now());
-      return { success: true, synced, failed: 0, conflicts };
+      return { success: true, synced, failed: 0, conflicts: conflictItems };
     } catch (error) {
       console.error("[Sync] Pull failed:", error);
-      return { success: false, synced, failed: 1, conflicts };
+      return { success: false, synced, failed: 1, conflicts: conflictItems };
     }
   }
 

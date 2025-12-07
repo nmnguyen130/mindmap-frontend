@@ -9,6 +9,7 @@ import {
   useAuthStore,
   selectAccessToken,
 } from "@/features/auth/store/auth-store";
+import { ConflictModal } from "@/components/sync/conflict-modal";
 
 interface SyncProviderProps {
   children: React.ReactNode;
@@ -128,5 +129,10 @@ export const SyncProvider: React.FC<SyncProviderProps> = ({
     };
   }, [reset]);
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <ConflictModal />
+    </>
+  );
 };

@@ -7,7 +7,7 @@ import {
 import React from "react";
 import { Platform } from "react-native";
 
-import { MindMapNode } from "@/features/mindmap/store/mindmap-store";
+import type { MindMapNode } from "@/features/mindmap";
 
 interface NodeProps {
   node: MindMapNode;

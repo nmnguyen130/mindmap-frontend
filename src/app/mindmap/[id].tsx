@@ -1,6 +1,6 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
 import Header from "@/components/layout/header";
@@ -10,48 +10,67 @@ import ActionButton from "@/components/ui/action-button";
 import BottomSheet from "@/components/ui/bottom-sheet";
 import InfoBadge from "@/components/ui/info-badge";
 import { defaultMindMap } from "@/data/default-mindmap";
-import { useMindMapStore, type MindMapNode } from "@/features/mindmap/store/mindmap-store";
+import { useMindmap, useMindmapUI } from "@/features/mindmap";
+import type { MindMapNode } from "@/features/mindmap";
 
 const MindMapScreen = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
-  const { getCurrentMap, loadMap, autoLayoutMap, isLoading, error } = useMindMapStore();
+
+  // Use the new TanStack Query hook for non-demo mindmaps
+  const isDemo = id === "default";
+  const { data, isLoading, error, updateNodePositions } = useMindmap(
+    isDemo ? null : (id ?? null)
+  );
+
   const [isActionsSheetVisible, setIsActionsSheetVisible] = useState(false);
   const [isLayouting, setIsLayouting] = useState(false);
 
+  // Transform DB data to UI format
+  const map = useMemo(() => {
+    if (isDemo) {
+      return defaultMindMap;
+    }
+
+    if (!data) return null;
+
+    // Transform from FullMindMap (DB) to MindMap (UI)
+    return {
+      id: data.mindMap.id,
+      title: data.mindMap.title,
+      central_topic: data.mindMap.central_topic,
+      summary: data.mindMap.summary,
+      nodes: data.nodes.map((row) => ({
+        id: row.id,
+        label: row.label,
+        keywords: row.keywords ? JSON.parse(row.keywords) : [],
+        level: row.level,
+        parent_id: row.parent_id,
+        position: { x: row.position_x, y: row.position_y },
+        notes: row.notes,
+      })),
+      edges: data.connections.map((row) => ({
+        id: row.id,
+        from: row.from_node_id,
+        to: row.to_node_id,
+        relationship: row.relationship,
+      })),
+    };
+  }, [isDemo, data]);
+
   const handleAutoLayout = async () => {
-    if (!id || typeof id !== 'string') return;
+    if (!id || typeof id !== "string" || !map) return;
 
     setIsLayouting(true);
     try {
-      await autoLayoutMap(id);
-      // Optional: Show success message
-      console.log('Layout applied successfully');
+      // TODO: Implement auto-layout with new nodeQueries
+      console.log("Auto-layout - to be reimplemented with new architecture");
     } catch (error) {
-      console.error('Auto-layout failed:', error);
-      // Optional: Show error alert
+      console.error("Auto-layout failed:", error);
     } finally {
       setIsLayouting(false);
     }
   };
-
-  useEffect(() => {
-    if (id && id !== "default") {
-      loadMap(id).catch((err) => {
-        console.error("Load map error:", err);
-      });
-    }
-  }, [id, loadMap]);
-
-  const map = useMemo(() => {
-    if (id === "default") {
-      return defaultMindMap;
-    }
-
-    return getCurrentMap();
-  }, [id, getCurrentMap]);
-
-  const isDemo = id === "default";
 
   const handleBackPress = useCallback(() => {
     router.back();
@@ -71,7 +90,7 @@ const MindMapScreen = () => {
       <View className="flex-1" style={{ backgroundColor: colors.background }}>
         <Header
           title={title}
-          onMenuPress={() => { }}
+          onMenuPress={() => {}}
           showBackButton
           onBackPress={handleBackPress}
         />
@@ -104,7 +123,7 @@ const MindMapScreen = () => {
       <View className="flex-1" style={{ backgroundColor: colors.background }}>
         <Header
           title="Error"
-          onMenuPress={() => { }}
+          onMenuPress={() => {}}
           showBackButton
           onBackPress={handleBackPress}
         />
@@ -115,11 +134,17 @@ const MindMapScreen = () => {
             color={colors.error}
             style={{ marginBottom: 16 }}
           />
-          <Text className="text-lg font-semibold mb-2" style={{ color: colors.foreground }}>
+          <Text
+            className="text-lg font-semibold mb-2"
+            style={{ color: colors.foreground }}
+          >
             Failed to load mind map
           </Text>
-          <Text className="text-sm text-center" style={{ color: colors.mutedForeground }}>
-            {error}
+          <Text
+            className="text-sm text-center"
+            style={{ color: colors.mutedForeground }}
+          >
+            {error?.message ?? "An error occurred"}
           </Text>
         </View>
       </View>
@@ -131,7 +156,7 @@ const MindMapScreen = () => {
       <View className="flex-1" style={{ backgroundColor: colors.background }}>
         <Header
           title="Not Found"
-          onMenuPress={() => { }}
+          onMenuPress={() => {}}
           showBackButton
           onBackPress={handleBackPress}
         />
@@ -142,10 +167,16 @@ const MindMapScreen = () => {
             color={colors.mutedForeground}
             style={{ marginBottom: 16 }}
           />
-          <Text className="text-lg font-semibold mb-2" style={{ color: colors.foreground }}>
+          <Text
+            className="text-lg font-semibold mb-2"
+            style={{ color: colors.foreground }}
+          >
             Mind map not found
           </Text>
-          <Text className="text-sm text-center" style={{ color: colors.mutedForeground }}>
+          <Text
+            className="text-sm text-center"
+            style={{ color: colors.mutedForeground }}
+          >
             The mind map you're looking for doesn't exist or has been deleted.
           </Text>
         </View>
@@ -157,7 +188,7 @@ const MindMapScreen = () => {
     <View className="flex-1" style={{ backgroundColor: colors.background }}>
       <Header
         title={map.title}
-        onMenuPress={() => { }}
+        onMenuPress={() => {}}
         showBackButton
         onBackPress={handleBackPress}
         rightAction={{
@@ -215,16 +246,16 @@ const MindMapScreen = () => {
             disabled={isLayouting || isLoading}
             className="px-3 py-1 rounded-full"
             style={{
-              backgroundColor: isLayouting || isLoading ? '#94a3b8' : '#3b82f6',
-              shadowColor: '#000',
+              backgroundColor: isLayouting || isLoading ? "#94a3b8" : "#3b82f6",
+              shadowColor: "#000",
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.25,
               shadowRadius: 3.84,
               elevation: 5,
             }}
           >
-            <Text style={{ color: 'white', fontSize: 13, fontWeight: '600' }}>
-              {isLayouting ? 'Layouting...' : 'Auto Layout'}
+            <Text style={{ color: "white", fontSize: 13, fontWeight: "600" }}>
+              {isLayouting ? "Layouting..." : "Auto Layout"}
             </Text>
           </Pressable>
         </View>
@@ -232,7 +263,11 @@ const MindMapScreen = () => {
 
       <View className="flex-1">
         {map.nodes.length > 0 ? (
-          <Canvas nodes={map.nodes} edges={map.edges} />
+          <Canvas
+            nodes={map.nodes}
+            edges={map.edges}
+            mindmapId={isDemo ? null : id}
+          />
         ) : (
           <View className="flex-1 items-center justify-center px-6">
             <MaterialIcons
@@ -241,10 +276,16 @@ const MindMapScreen = () => {
               color={colors.mutedForeground}
               style={{ marginBottom: 16 }}
             />
-            <Text className="text-base font-semibold mb-1" style={{ color: colors.foreground }}>
+            <Text
+              className="text-base font-semibold mb-1"
+              style={{ color: colors.foreground }}
+            >
               Empty mind map
             </Text>
-            <Text className="text-sm text-center" style={{ color: colors.mutedForeground }}>
+            <Text
+              className="text-sm text-center"
+              style={{ color: colors.mutedForeground }}
+            >
               No nodes to display yet
             </Text>
           </View>

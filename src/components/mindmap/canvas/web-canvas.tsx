@@ -9,12 +9,13 @@ import {
 } from "@xyflow/react";
 import { useMemo } from "react";
 
-import { MindMapNode, MindmapData } from "@/features/mindmap/store/mindmap-store";
+import type { MindMapNode, MindmapData } from "@/features/mindmap";
 import "@xyflow/react/dist/style.css";
 
 interface WebCanvasProps {
   nodes: MindMapNode[];
-  edges: MindmapData['edges'];
+  edges: MindmapData["edges"];
+  mindmapId?: string | null;
 }
 
 // Convert MindMapNode to ReactFlow Node with better styling
@@ -40,7 +41,7 @@ const convertToReactFlowNode = (node: MindMapNode): Node => ({
 });
 
 // Convert connections to ReactFlow Edges with better styling
-const convertToReactFlowEdges = (edges: MindmapData['edges']): Edge[] => {
+const convertToReactFlowEdges = (edges: MindmapData["edges"]): Edge[] => {
   return edges.map((edge) => ({
     id: `${edge.from}-${edge.to}`,
     source: edge.from,

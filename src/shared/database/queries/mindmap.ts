@@ -1,5 +1,10 @@
 import { getDB } from "../client";
-import type { MindMapRow, MindMapNodeRow, ConnectionRow, FullMindMap } from "../types";
+import type {
+  MindMapRow,
+  MindMapNodeRow,
+  ConnectionRow,
+  FullMindMap,
+} from "../types";
 
 const now = () => Date.now();
 
@@ -66,7 +71,11 @@ export const mindmapQueries = {
     >
   ): Promise<void> {
     const db = await getDB();
-    const sets: string[] = ["updated_at = ?", "version = version + 1", "is_synced = 0"];
+    const sets: string[] = [
+      "updated_at = ?",
+      "version = version + 1",
+      "is_synced = 0",
+    ];
     const values: (string | number | null)[] = [now()];
 
     if (updates.title !== undefined) {
@@ -113,5 +122,39 @@ export const mindmapQueries = {
       "SELECT * FROM mindmaps WHERE updated_at > ?",
       [timestamp]
     );
+  },
+
+  // Batch load multiple mindmaps by IDs (for sync optimization)
+  async getByIds(ids: string[]): Promise<FullMindMap[]> {
+    if (ids.length === 0) return [];
+    const db = await getDB();
+    const placeholders = ids.map(() => "?").join(",");
+
+    // Batch fetch mindmaps
+    const mindmaps = await db.getAllAsync<MindMapRow>(
+      `SELECT * FROM mindmaps WHERE id IN (${placeholders}) AND deleted_at IS NULL`,
+      ids
+    );
+
+    if (mindmaps.length === 0) return [];
+
+    // Batch fetch all nodes for these mindmaps
+    const nodes = await db.getAllAsync<MindMapNodeRow>(
+      `SELECT * FROM mindmap_nodes WHERE mindmap_id IN (${placeholders}) AND deleted_at IS NULL`,
+      ids
+    );
+
+    // Batch fetch all connections for these mindmaps
+    const connections = await db.getAllAsync<ConnectionRow>(
+      `SELECT * FROM connections WHERE mindmap_id IN (${placeholders}) AND deleted_at IS NULL`,
+      ids
+    );
+
+    // Group by mindmap_id
+    return mindmaps.map((m) => ({
+      mindMap: m,
+      nodes: nodes.filter((n) => n.mindmap_id === m.id),
+      connections: connections.filter((c) => c.mindmap_id === m.id),
+    }));
   },
 };

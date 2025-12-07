@@ -14,7 +14,7 @@ import {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
-import { MindMapNode } from "@/features/mindmap/store/mindmap-store";
+import type { MindMapNode } from "@/features/mindmap";
 import { getNodeBox } from "@/features/mindmap/utils/node-utils";
 
 interface ViewportCullingProps {
@@ -147,17 +147,13 @@ const ViewportCulling = ({
 
     // Convert screen viewport to world coordinates
     const worldViewportLeft =
-      (viewportCenterX - screenWidth / 2 - cameraTranslateX) /
-      currentScale;
+      (viewportCenterX - screenWidth / 2 - cameraTranslateX) / currentScale;
     const worldViewportRight =
-      (viewportCenterX + screenWidth / 2 - cameraTranslateX) /
-      currentScale;
+      (viewportCenterX + screenWidth / 2 - cameraTranslateX) / currentScale;
     const worldViewportTop =
-      (viewportCenterY - screenHeight / 2 - cameraTranslateY) /
-      currentScale;
+      (viewportCenterY - screenHeight / 2 - cameraTranslateY) / currentScale;
     const worldViewportBottom =
-      (viewportCenterY + screenHeight / 2 - cameraTranslateY) /
-      currentScale;
+      (viewportCenterY + screenHeight / 2 - cameraTranslateY) / currentScale;
 
     // Add margin for smooth scrolling
     const worldMargin = CULLING_MARGIN / currentScale;

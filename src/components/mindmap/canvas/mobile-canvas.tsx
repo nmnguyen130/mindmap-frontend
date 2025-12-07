@@ -3,7 +3,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
 
 import { useTheme } from "@/components/providers/theme-provider";
-import { MindMapNode, MindmapData, useMindMapStore } from "@/features/mindmap/store/mindmap-store";
+import type { MindMapNode, MindmapData } from "@/features/mindmap";
 import { getNodeBox } from "@/features/mindmap/utils/node-utils";
 import { useFPSDetection } from "@/shared/hooks/use-fps-detection";
 
@@ -17,16 +17,16 @@ import ViewportCulling from "./viewport-culling";
 
 interface MobileCanvasProps {
   nodes: MindMapNode[];
-  edges: MindmapData['edges'];
+  edges: MindmapData["edges"];
+  mindmapId?: string | null;
 }
 
-const MobileCanvas = ({ nodes, edges }: MobileCanvasProps) => {
+const MobileCanvas = ({
+  nodes,
+  edges,
+  mindmapId = null,
+}: MobileCanvasProps) => {
   const { colors, isDark } = useTheme();
-  const { getCurrentMap } = useMindMapStore();
-
-  // Get current mindmap ID
-  const currentMap = getCurrentMap();
-  const mindmapId = currentMap?.id || null;
 
   // FPS monitoring for development
   const { isInteracting, fpsMetrics, startInteraction, stopInteraction } =
@@ -70,7 +70,7 @@ const MobileCanvas = ({ nodes, edges }: MobileCanvasProps) => {
     const neighbors: MindMapNode[] = [];
 
     // Find neighbors through edges
-    edges.forEach(edge => {
+    edges.forEach((edge) => {
       if (edge.from === selectedNode.id) {
         const target = nodeMap.get(edge.to);
         if (target) neighbors.push(target);

@@ -1,5 +1,11 @@
 import { MaterialIcons } from "@expo/vector-icons";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -15,7 +21,7 @@ import {
 
 import { ThemeColors } from "@/components/providers/theme-provider";
 import { useRagChat } from "@/features/document/hooks/use-rag-chat";
-import { MindMapNode, useMindMapStore } from "@/features/mindmap/store/mindmap-store";
+import type { MindMapNode } from "@/features/mindmap";
 
 interface NodeSelectionPanelProps {
   selectedNode: MindMapNode | null;
@@ -32,22 +38,20 @@ const NodeSelectionPanel = ({
   mindmapId,
   onClose,
 }: NodeSelectionPanelProps) => {
-  const { getCurrentMap } = useMindMapStore();
   const [aiQuery, setAiQuery] = useState<string>("");
   const slideAnim = useRef(new Animated.Value(600)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
   const aiInputRef = useRef<TextInput>(null);
   const chatScrollRef = useRef<ScrollView>(null);
 
-  const currentMap = getCurrentMap();
-
   // RAG Chat hook
-  const { messages, isStreaming, sendMessage, generateSummary, clear } = useRagChat({
-    documentId: mindmapId || '',
-    onError: (error) => {
-      console.error('RAG Chat error:', error);
-    },
-  });
+  const { messages, isStreaming, sendMessage, generateSummary, clear } =
+    useRagChat({
+      documentId: mindmapId || "",
+      onError: (error) => {
+        console.error("RAG Chat error:", error);
+      },
+    });
 
   // Animate panel in/out
   useEffect(() => {
@@ -125,7 +129,10 @@ const NodeSelectionPanel = ({
     if (relatedNodes.length <= 3) {
       return relatedNodes.map((n) => n.label).join(", ");
     }
-    return `${relatedNodes.slice(0, 2).map((n) => n.label).join(", ")} and ${relatedNodes.length - 2} more`;
+    return `${relatedNodes
+      .slice(0, 2)
+      .map((n) => n.label)
+      .join(", ")} and ${relatedNodes.length - 2} more`;
   }, [relatedNodes]);
 
   if (!selectedNode) return null;
@@ -135,20 +142,17 @@ const NodeSelectionPanel = ({
       {/* Backdrop Overlay */}
       <Animated.View
         style={{
-          position: 'absolute',
+          position: "absolute",
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
           opacity: backdropAnim,
         }}
-        pointerEvents={selectedNode ? 'auto' : 'none'}
+        pointerEvents={selectedNode ? "auto" : "none"}
       >
-        <Pressable
-          style={{ flex: 1 }}
-          onPress={() => onClose?.()}
-        />
+        <Pressable style={{ flex: 1 }} onPress={() => onClose?.()} />
       </Animated.View>
 
       {/* Panel */}
@@ -219,7 +223,10 @@ const NodeSelectionPanel = ({
                 keyboardShouldPersistTaps="handled"
               >
                 {/* General Info Section */}
-                <View className="px-4 py-3 border-b" style={{ borderBottomColor: colors.border }}>
+                <View
+                  className="px-4 py-3 border-b"
+                  style={{ borderBottomColor: colors.border }}
+                >
                   <Text
                     className="text-xs font-bold uppercase mb-2"
                     style={{ color: colors.mutedForeground }}
@@ -228,36 +235,46 @@ const NodeSelectionPanel = ({
                   </Text>
 
                   {/* Keywords */}
-                  {selectedNode.keywords && selectedNode.keywords.length > 0 && (
-                    <View className="mb-2">
-                      <Text className="text-xs mb-1" style={{ color: colors.mutedForeground }}>
-                        Keywords:
-                      </Text>
-                      <View className="flex-row flex-wrap gap-1.5">
-                        {selectedNode.keywords.map((keyword, idx) => (
-                          <View
-                            key={idx}
-                            className="px-2.5 py-1 rounded-full"
-                            style={{ backgroundColor: colors.primary + '20' }}
-                          >
-                            <Text
-                              className="text-xs font-medium"
-                              style={{ color: colors.primary }}
+                  {selectedNode.keywords &&
+                    selectedNode.keywords.length > 0 && (
+                      <View className="mb-2">
+                        <Text
+                          className="text-xs mb-1"
+                          style={{ color: colors.mutedForeground }}
+                        >
+                          Keywords:
+                        </Text>
+                        <View className="flex-row flex-wrap gap-1.5">
+                          {selectedNode.keywords.map((keyword, idx) => (
+                            <View
+                              key={idx}
+                              className="px-2.5 py-1 rounded-full"
+                              style={{ backgroundColor: colors.primary + "20" }}
                             >
-                              {keyword}
-                            </Text>
-                          </View>
-                        ))}
+                              <Text
+                                className="text-xs font-medium"
+                                style={{ color: colors.primary }}
+                              >
+                                {keyword}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
                       </View>
-                    </View>
-                  )}
+                    )}
 
                   {/* Level */}
                   <View className="flex-row items-center gap-2 mb-2">
-                    <Text className="text-xs" style={{ color: colors.mutedForeground }}>
+                    <Text
+                      className="text-xs"
+                      style={{ color: colors.mutedForeground }}
+                    >
                       Level:
                     </Text>
-                    <Text className="text-xs font-semibold" style={{ color: colors.foreground }}>
+                    <Text
+                      className="text-xs font-semibold"
+                      style={{ color: colors.foreground }}
+                    >
                       {selectedNode.level}
                     </Text>
                   </View>
@@ -266,7 +283,11 @@ const NodeSelectionPanel = ({
                 {/* AI Chat Section */}
                 <View className="px-4 py-3 flex-1">
                   <View className="flex-row items-center gap-2 mb-2">
-                    <MaterialIcons name="psychology" size={18} color={colors.primary} />
+                    <MaterialIcons
+                      name="psychology"
+                      size={18}
+                      color={colors.primary}
+                    />
                     <Text
                       className="text-xs font-bold uppercase"
                       style={{ color: colors.mutedForeground }}
@@ -289,28 +310,32 @@ const NodeSelectionPanel = ({
                   >
                     <View className="p-3 gap-3">
                       {messages.length === 0 && !isStreaming ? (
-                        <Text className="text-xs text-center" style={{ color: colors.mutedForeground }}>
+                        <Text
+                          className="text-xs text-center"
+                          style={{ color: colors.mutedForeground }}
+                        >
                           Ask questions about this topic...
                         </Text>
                       ) : (
                         messages.map((msg, idx) => (
                           <View
                             key={idx}
-                            className={`rounded-xl px-3 py-2 ${msg.role === 'user' ? 'self-end' : 'self-start'
-                              }`}
+                            className={`rounded-xl px-3 py-2 ${
+                              msg.role === "user" ? "self-end" : "self-start"
+                            }`}
                             style={{
                               backgroundColor:
-                                msg.role === 'user'
+                                msg.role === "user"
                                   ? colors.primary
                                   : colors.secondary,
-                              maxWidth: '85%',
+                              maxWidth: "85%",
                             }}
                           >
                             <Text
                               className="text-sm leading-relaxed"
                               style={{
                                 color:
-                                  msg.role === 'user'
+                                  msg.role === "user"
                                     ? colors.primaryForeground
                                     : colors.secondaryForeground,
                               }}
@@ -322,8 +347,14 @@ const NodeSelectionPanel = ({
                       )}
                       {isStreaming && (
                         <View className="flex-row items-center gap-2">
-                          <ActivityIndicator size="small" color={colors.primary} />
-                          <Text className="text-xs" style={{ color: colors.mutedForeground }}>
+                          <ActivityIndicator
+                            size="small"
+                            color={colors.primary}
+                          />
+                          <Text
+                            className="text-xs"
+                            style={{ color: colors.mutedForeground }}
+                          >
                             AI is thinking...
                           </Text>
                         </View>
@@ -334,7 +365,10 @@ const NodeSelectionPanel = ({
                   {/* AI Input Bar */}
                   <View
                     className="rounded-xl border overflow-hidden"
-                    style={{ borderColor: colors.border, backgroundColor: colors.background }}
+                    style={{
+                      borderColor: colors.border,
+                      backgroundColor: colors.background,
+                    }}
                   >
                     <View className="flex-row items-center gap-2 px-3 py-2">
                       <TextInput

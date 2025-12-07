@@ -260,14 +260,76 @@ const { data: map } = useMindmap(currentMapId);
 
 ## Conflict Resolution
 
-Current strategy: **Last-Write-Wins (LWW)**
+### Strategy: Last-Write-Wins (LWW) + User-Facing Conflict UI
 
 ```
 Local version: 3, Remote version: 4
-    └─▶ Remote wins → Update local
+    └─▶ Remote wins → Update local automatically
 
 Local version: 3 (modified), Remote version: 3
-    └─▶ Conflict → Keep local (will push later)
+    └─▶ Conflict detected → Show ConflictModal to user
+                            └─▶ User chooses: "Keep Local" or "Use Remote"
+```
+
+### Conflict UI Flow
+
+```
+Sync detects conflict (both local & remote modified)
+    │
+    ▼
+SyncResult.conflicts: ConflictItem[]
+    │
+    ▼
+useSyncStore stores conflicts + shows modal
+    │
+    ▼
+ConflictModal renders:
+  ┌──────────────────────────────────────┐
+  │ ⚠ Sync Conflicts Detected            │
+  │                                      │
+  │ 📱 Local: "My Map v3" (5 min ago)    │
+  │ ☁️ Remote: "My Map v3" (2 min ago)   │
+  │                                      │
+  │ [Keep Local]     [Use Remote]       │
+  └──────────────────────────────────────┘
+    │
+    └─▶ User resolution → resolveConflict(id)
+                            └─▶ Next sync applies decision
+```
+
+### ConflictItem Structure
+
+```typescript
+interface ConflictItem {
+  id: string;
+  table: string;
+  localVersion: number;
+  remoteVersion: number;
+  localTitle?: string;
+  remoteTitle?: string;
+  localUpdatedAt?: number;
+  remoteUpdatedAt?: number;
+}
+```
+
+---
+
+## Performance Optimizations
+
+### Batch Query Loading
+
+Instead of N database queries during sync, we batch-load all affected mindmaps:
+
+```
+Before: 5 pending mindmaps → 5 × getFull() → 15 DB queries
+After:  5 pending mindmaps → 1 × getByIds() → 3 DB queries
+```
+
+```typescript
+// In sync-service.ts
+const mindmapIdsToSync = changes.map((c) => c.record_id);
+const mindmapsToSync = await mindmapQueries.getByIds(mindmapIdsToSync);
+const mindmapMap = new Map(mindmapsToSync.map((m) => [m.mindMap.id, m]));
 ```
 
 ---
@@ -279,6 +341,12 @@ Local version: 3 (modified), Remote version: 3
 1. Check `isAuthenticated` — sync only works when logged in
 2. Check `isOnline` in SyncProvider
 3. Check `changes` table for pending items
+
+### Conflicts not resolving?
+
+1. Tap the orange "⚠ conflicts" link in SyncStatus
+2. Choose "Keep Local" or "Use Remote" for each conflict
+3. Sync will automatically apply your decisions
 
 ### Old data showing?
 
@@ -293,4 +361,5 @@ queryClient.invalidateQueries({ queryKey: ["mindmaps"] });
 // In sync-service.ts
 console.log("[Sync] Pending changes:", changes);
 console.log("[Sync] Push result:", synced, failed);
+console.log("[Sync] Conflicts:", conflictItems);
 ```

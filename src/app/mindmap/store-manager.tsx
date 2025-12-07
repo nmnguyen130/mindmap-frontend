@@ -1,251 +1,271 @@
+import { MaterialIcons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import React, { useState } from "react";
-import { Alert, ScrollView, Text, TouchableOpacity, View, ActivityIndicator } from "react-native";
-import { useMindmaps, useCreateMindmap, useDeleteMindmap, mindmapKeys } from "@/features/mindmap/hooks";
-import { useQueryClient } from "@tanstack/react-query";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 
-// ============================================================================
-// Store Manager Screen - Test TanStack Query hooks with SQLite
-// ============================================================================
+import Header from "@/components/layout/header";
+import { useTheme } from "@/components/providers/theme-provider";
+import { useMindmaps } from "@/features/mindmap";
 
+/**
+ * Store Manager Screen
+ * Developer utility for managing local mindmap database
+ */
 const StoreManagerScreen = () => {
-  const queryClient = useQueryClient();
+  const { colors } = useTheme();
+  const { mindmaps, isLoading, error, create, remove, refetch } = useMindmaps();
   const [logs, setLogs] = useState<string[]>([]);
 
-  // TanStack Query hooks
-  const { data: mindmaps = [], isLoading, error, refetch } = useMindmaps();
-  const createMutation = useCreateMindmap();
-  const deleteMutation = useDeleteMindmap();
-
   const addLog = (message: string) => {
-    console.log("[Manager]", message);
-    setLogs((prev) => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
+    console.log("[StoreManager]", message);
+    setLogs((prev) => [
+      `[${new Date().toLocaleTimeString()}] ${message}`,
+      ...prev.slice(0, 49), // Keep last 50 logs
+    ]);
   };
 
-  // ========================================================================
-  // Test Actions
-  // ========================================================================
-
-  const handleCreate = async () => {
-    addLog("Creating test mindmap...");
+  const handleCreateTest = async () => {
     const timestamp = Date.now();
     const id = `test-${timestamp}`;
 
+    addLog("Creating test mindmap...");
+
     try {
-      await createMutation.mutateAsync({
+      await create.mutateAsync({
         id,
         title: `Test Mindmap ${new Date().toLocaleTimeString()}`,
         central_topic: "Main Topic",
-        summary: "Created from Store Manager",
+        summary: "Created via Store Manager",
         nodes: [
           {
             id: `node1-${timestamp}`,
             label: "Central Node",
-            keywords: ["main", "center"],
+            keywords: ["main"],
             level: 0,
             position: { x: 0, y: 0 },
           },
           {
             id: `node2-${timestamp}`,
-            label: "Child Node 1",
+            label: "Child Node",
             keywords: ["child"],
             level: 1,
             parent_id: `node1-${timestamp}`,
-            position: { x: 200, y: -100 },
-          },
-          {
-            id: `node3-${timestamp}`,
-            label: "Child Node 2",
-            keywords: ["child"],
-            level: 1,
-            parent_id: `node1-${timestamp}`,
-            position: { x: 200, y: 100 },
+            position: { x: 200, y: 0 },
           },
         ],
         edges: [
-          { id: `edge1-${timestamp}`, from: `node1-${timestamp}`, to: `node2-${timestamp}` },
-          { id: `edge2-${timestamp}`, from: `node1-${timestamp}`, to: `node3-${timestamp}` },
+          {
+            id: `edge1-${timestamp}`,
+            from: `node1-${timestamp}`,
+            to: `node2-${timestamp}`,
+          },
         ],
       });
 
-      addLog(`✅ Created mindmap: ${id}`);
-      addLog(`   3 nodes, 2 edges`);
+      addLog(`✅ Created: ${id}`);
     } catch (err) {
-      addLog(`❌ Create failed: ${err instanceof Error ? err.message : String(err)}`);
+      addLog(`❌ Failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
-  const handleRefresh = async () => {
-    addLog("Refreshing from SQLite...");
-    try {
-      await refetch();
-      addLog(`✅ Loaded ${mindmaps.length} mindmaps`);
-    } catch (err) {
-      addLog(`❌ Refresh failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  };
-
-  const handleViewData = () => {
-    addLog(`=== Database Contents (${mindmaps.length} mindmaps) ===`);
-
-    if (mindmaps.length === 0) {
-      addLog("   (empty)");
-      return;
-    }
-
-    mindmaps.forEach((map, i) => {
-      addLog(`${i + 1}. "${map.title}"`);
-      addLog(`   ID: ${map.id}`);
-      addLog(`   Updated: ${new Date(map.updated_at).toLocaleString()}`);
-      addLog(`   Synced: ${map.is_synced ? "Yes" : "No"}`);
-    });
-  };
-
-  const handleDelete = () => {
-    if (mindmaps.length === 0) {
-      addLog("No mindmaps to delete");
-      return;
-    }
-
-    const options = mindmaps.map((m) => ({ text: m.title, id: m.id }));
-
-    Alert.alert("Delete Mindmap", "Select mindmap to delete:", [
-      ...options.map((opt) => ({
-        text: opt.text,
-        style: "destructive" as const,
+  const handleDelete = (id: string, title: string) => {
+    Alert.alert("Delete Mindmap", `Delete "${title}"?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
         onPress: async () => {
-          addLog(`Deleting: ${opt.text}...`);
+          addLog(`Deleting: ${title}...`);
           try {
-            await deleteMutation.mutateAsync(opt.id);
-            addLog(`✅ Deleted: ${opt.id}`);
+            await remove.mutateAsync(id);
+            addLog(`✅ Deleted: ${id}`);
           } catch (err) {
-            addLog(`❌ Delete failed: ${err instanceof Error ? err.message : String(err)}`);
+            addLog(
+              `❌ Failed: ${err instanceof Error ? err.message : String(err)}`
+            );
           }
         },
-      })),
-      { text: "Cancel", style: "cancel" },
+      },
     ]);
   };
 
-  const handleClearCache = () => {
-    queryClient.clear();
-    addLog("✅ TanStack Query cache cleared");
+  const handleRefresh = async () => {
+    addLog("Refreshing...");
+    await refetch();
+    addLog(`✅ Loaded ${mindmaps.length} mindmaps`);
   };
 
-  const clearLogs = () => setLogs([]);
-
-  // ========================================================================
-  // Render
-  // ========================================================================
-
-  const isBusy = isLoading || createMutation.isPending || deleteMutation.isPending;
+  const isBusy = isLoading || create.isPending || remove.isPending;
 
   return (
-    <View className="flex-1 bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <View className="p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <Text className="text-xl font-bold text-gray-900 dark:text-gray-100">
-          Store Manager (TanStack Query)
-        </Text>
-        <Text className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-          Test SQLite + TanStack Query hooks
-        </Text>
+    <View className="flex-1" style={{ backgroundColor: colors.background }}>
+      <Header
+        title="Store Manager"
+        showBackButton
+        onBackPress={() => router.back()}
+        onMenuPress={() => {}}
+      />
+
+      {/* Stats Bar */}
+      <View
+        className="px-4 py-2 flex-row items-center justify-between border-b"
+        style={{ borderColor: colors.border, backgroundColor: colors.surface }}
+      >
+        <View className="flex-row items-center gap-2">
+          {isBusy && <ActivityIndicator size="small" color={colors.primary} />}
+          <Text style={{ color: colors.foreground }}>
+            {mindmaps.length} mindmaps
+          </Text>
+        </View>
+        <Pressable
+          onPress={handleRefresh}
+          disabled={isBusy}
+          className="px-3 py-1 rounded-full"
+          style={{ backgroundColor: colors.secondary }}
+        >
+          <Text style={{ color: colors.secondaryForeground, fontSize: 12 }}>
+            Refresh
+          </Text>
+        </Pressable>
       </View>
 
-      {/* Status Bar */}
-      <View className="px-4 py-2 bg-blue-50 dark:bg-blue-900 flex-row items-center">
-        {isBusy && <ActivityIndicator size="small" className="mr-2" />}
-        <Text className="text-blue-800 dark:text-blue-200 text-sm">
-          {mindmaps.length} mindmaps | {isBusy ? "Working..." : "Ready"}
+      {/* Error Display */}
+      {error && (
+        <View className="mx-4 mt-2 p-3 rounded-lg bg-red-100">
+          <Text className="text-red-800 text-sm">
+            {error instanceof Error ? error.message : "An error occurred"}
+          </Text>
+        </View>
+      )}
+
+      {/* Mindmap List */}
+      <ScrollView className="flex-1 p-4">
+        <Text
+          className="text-xs font-semibold uppercase mb-2"
+          style={{ color: colors.mutedForeground }}
+        >
+          Mindmaps
         </Text>
-      </View>
 
-      {/* Action Buttons */}
-      <View className="p-4">
-        <View className="flex-row mb-3">
-          <TouchableOpacity
-            className="bg-blue-600 p-3 rounded-lg flex-1 mr-2"
-            onPress={() => void handleCreate()}
-            disabled={isBusy}
+        {mindmaps.length === 0 ? (
+          <View
+            className="p-4 rounded-xl items-center"
+            style={{ backgroundColor: colors.surface }}
           >
-            <Text className="text-white text-center font-semibold text-sm">
-              Create Test
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            className="bg-green-600 p-3 rounded-lg flex-1 mr-2"
-            onPress={() => void handleRefresh()}
-            disabled={isBusy}
-          >
-            <Text className="text-white text-center font-semibold text-sm">
-              Refresh
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            className="bg-indigo-600 p-3 rounded-lg flex-1"
-            onPress={handleViewData}
-            disabled={isBusy}
-          >
-            <Text className="text-white text-center font-semibold text-sm">
-              View Data
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View className="flex-row">
-          <TouchableOpacity
-            className="bg-red-600 p-3 rounded-lg flex-1 mr-2"
-            onPress={handleDelete}
-            disabled={isBusy || mindmaps.length === 0}
-          >
-            <Text className="text-white text-center font-semibold text-sm">
-              Delete
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            className="bg-orange-600 p-3 rounded-lg flex-1 mr-2"
-            onPress={handleClearCache}
-          >
-            <Text className="text-white text-center font-semibold text-sm">
-              Clear Cache
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            className="bg-gray-600 p-3 rounded-lg flex-1"
-            onPress={clearLogs}
-          >
-            <Text className="text-white text-center font-semibold text-sm">
-              Clear Logs
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {error && (
-          <View className="bg-red-100 dark:bg-red-900 p-3 rounded-lg mt-3">
-            <Text className="text-red-800 dark:text-red-200">
-              Error: {error instanceof Error ? error.message : String(error)}
+            <MaterialIcons
+              name="folder-open"
+              size={32}
+              color={colors.mutedForeground}
+            />
+            <Text className="mt-2" style={{ color: colors.mutedForeground }}>
+              No mindmaps found
             </Text>
           </View>
+        ) : (
+          mindmaps.map((map) => (
+            <View
+              key={map.id}
+              className="p-3 rounded-xl mb-2 flex-row items-center justify-between"
+              style={{ backgroundColor: colors.surface }}
+            >
+              <View className="flex-1 mr-3">
+                <Text
+                  className="font-medium"
+                  style={{ color: colors.foreground }}
+                  numberOfLines={1}
+                >
+                  {map.title}
+                </Text>
+                <Text
+                  className="text-xs mt-0.5"
+                  style={{ color: colors.mutedForeground }}
+                >
+                  {new Date(map.updated_at).toLocaleString()} •{" "}
+                  {map.is_synced ? "Synced" : "Pending"}
+                </Text>
+              </View>
+              <View className="flex-row gap-2">
+                <Pressable
+                  onPress={() => router.push(`/mindmap/${map.id}`)}
+                  className="p-2 rounded-lg"
+                  style={{ backgroundColor: colors.primary + "20" }}
+                >
+                  <MaterialIcons
+                    name="visibility"
+                    size={18}
+                    color={colors.primary}
+                  />
+                </Pressable>
+                <Pressable
+                  onPress={() => handleDelete(map.id, map.title)}
+                  className="p-2 rounded-lg"
+                  style={{ backgroundColor: colors.error + "20" }}
+                >
+                  <MaterialIcons name="delete" size={18} color={colors.error} />
+                </Pressable>
+              </View>
+            </View>
+          ))
         )}
-      </View>
 
-      {/* Logs */}
-      <ScrollView className="flex-1 px-4 pb-4">
-        <Text className="text-base font-semibold mb-2 text-gray-900 dark:text-gray-100">
-          Logs ({logs.length})
+        {/* Logs Section */}
+        <Text
+          className="text-xs font-semibold uppercase mt-4 mb-2"
+          style={{ color: colors.mutedForeground }}
+        >
+          Activity Log ({logs.length})
         </Text>
-        {logs.map((log, i) => (
-          <Text
-            key={i}
-            className="text-xs font-mono mb-1 text-gray-700 dark:text-gray-300 leading-tight"
-          >
-            {log}
-          </Text>
-        ))}
+
+        <View
+          className="p-3 rounded-xl"
+          style={{ backgroundColor: colors.surface }}
+        >
+          {logs.length === 0 ? (
+            <Text
+              className="text-xs text-center"
+              style={{ color: colors.mutedForeground }}
+            >
+              No activity yet
+            </Text>
+          ) : (
+            logs.map((log, i) => (
+              <Text
+                key={i}
+                className="text-xs font-mono mb-1"
+                style={{ color: colors.foreground }}
+              >
+                {log}
+              </Text>
+            ))
+          )}
+        </View>
       </ScrollView>
+
+      {/* Bottom Action Bar */}
+      <View
+        className="p-4 border-t"
+        style={{ borderColor: colors.border, backgroundColor: colors.surface }}
+      >
+        <Pressable
+          onPress={handleCreateTest}
+          disabled={isBusy}
+          className="py-3 rounded-xl items-center"
+          style={{
+            backgroundColor: isBusy ? colors.mutedForeground : colors.primary,
+          }}
+        >
+          <Text className="font-semibold" style={{ color: "#fff" }}>
+            {create.isPending ? "Creating..." : "Create Test Mindmap"}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 };

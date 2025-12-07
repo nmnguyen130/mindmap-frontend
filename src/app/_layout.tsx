@@ -4,17 +4,20 @@ import { Stack } from "expo-router";
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
+import {
+  SafeAreaProvider,
+  initialWindowMetrics,
+} from "react-native-safe-area-context";
 
 import { ModalProvider } from "@/components/providers/modal-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AuthProvider } from "@/features/auth";
 import { AuthenticatedSyncWrapper } from "@/features/sync";
 import { queryClient } from "@/shared/api/client";
-import { databaseService } from "@/shared/database/sqlite-client";
+import { getDB } from "@/shared/database";
 
 // Initialize database
-databaseService.initialize().catch(console.error);
+getDB().catch(console.error);
 
 const RootLayout = () => {
   return (

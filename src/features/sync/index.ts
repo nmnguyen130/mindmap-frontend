@@ -14,5 +14,7 @@ export {
   selectLastSyncAt,
   selectLastSyncResult,
   selectSyncError,
+  selectConflictItems,
+  selectShowConflictModal,
 } from "./store/sync-store";
-export type { SyncResult } from "./store/sync-store";
+export type { SyncResult, ConflictItem } from "./store/sync-store";

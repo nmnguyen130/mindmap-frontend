@@ -1,7 +1,7 @@
 import { Path, Skia, SkPaint } from "@shopify/react-native-skia";
 import React from "react";
 
-import { MindMapNode } from "@/features/mindmap/store/mindmap-store";
+import type { MindMapNode } from "@/features/mindmap";
 
 interface ConnectionProps {
   fromNode: MindMapNode;
