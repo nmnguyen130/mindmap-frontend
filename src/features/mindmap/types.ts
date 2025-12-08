@@ -1,17 +1,13 @@
 // Re-export database types for convenience
 export type {
-  MindMapRow,
-  MindMapNodeRow,
   ConnectionRow,
   FullMindMap,
-} from "@/shared/database";
+  MindMapNodeRow,
+  MindMapRow,
+} from "@/database";
 
 // Import for internal use
-import type {
-  MindMapNodeRow,
-  ConnectionRow,
-  FullMindMap,
-} from "@/shared/database";
+import type { ConnectionRow, FullMindMap, MindMapNodeRow } from "@/database";
 
 // UI-friendly types (for components that don't need raw DB types)
 

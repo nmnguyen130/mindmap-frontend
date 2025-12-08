@@ -1,21 +1,21 @@
-import React, { useCallback } from "react";
-import { View, Text, TouchableOpacity, ScrollView } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
-import Modal from "@/components/ui/modal/modal";
 import { useTheme } from "@/components/providers/theme-provider";
+import Modal from "@/components/ui/modal/modal";
+import { mindmapQueries } from "@/database";
 import {
-  useSyncStore,
-  selectConflictItems,
-  selectShowConflictModal,
-  type ConflictItem,
-} from "@/features/sync/store/sync-store";
-import { mindmapQueries } from "@/shared/database";
+    selectAccessToken,
+    useAuthStore,
+} from "@/features/auth/store/auth-store";
 import { syncService } from "@/features/sync/services/sync-service";
 import {
-  useAuthStore,
-  selectAccessToken,
-} from "@/features/auth/store/auth-store";
+    selectConflictItems,
+    selectShowConflictModal,
+    useSyncStore,
+    type ConflictItem,
+} from "@/features/sync/store/sync-store";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
+import React, { useCallback } from "react";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 interface ConflictCardProps {
   conflict: ConflictItem;

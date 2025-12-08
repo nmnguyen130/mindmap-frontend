@@ -9,7 +9,6 @@ import {
   selectUser,
   useAuthStore,
 } from "../store/auth-store";
-import { clearTokens, saveTokens } from "../utils/secure-storage";
 
 // Stable query keys for caching
 export const authKeys = {
@@ -17,7 +16,7 @@ export const authKeys = {
   me: () => [...authKeys.all, "me"] as const,
 };
 
-/** 
+/**
  * Main auth hook:
  * - Zustand for tokens + auth state
  * - React Query for server user state
@@ -50,8 +49,8 @@ export const useAuth = () => {
   // Login mutation
   const login = useMutation({
     mutationFn: authApi.login,
-    onSuccess: async (data: AuthResponse) => {
-      await saveTokens(data.access_token, data.refresh_token);
+    onSuccess: (data: AuthResponse) => {
+      // Zustand persist handles secure storage automatically
       setAuth(data.user, data.access_token, data.refresh_token);
       queryClient.invalidateQueries({ queryKey: authKeys.all });
     },
@@ -60,8 +59,7 @@ export const useAuth = () => {
   // Register mutation
   const register = useMutation({
     mutationFn: authApi.register,
-    onSuccess: async (data: AuthResponse) => {
-      await saveTokens(data.access_token, data.refresh_token);
+    onSuccess: (data: AuthResponse) => {
       setAuth(data.user, data.access_token, data.refresh_token);
       queryClient.invalidateQueries({ queryKey: authKeys.all });
     },
@@ -85,8 +83,7 @@ export const useAuth = () => {
   // OAuth callback mutation (processes tokens + fetches user)
   const handleOAuthCallback = useMutation({
     mutationFn: authApi.handleOAuthCallback,
-    onSuccess: async (data: AuthResponse) => {
-      await saveTokens(data.access_token, data.refresh_token);
+    onSuccess: (data: AuthResponse) => {
       setAuth(data.user, data.access_token, data.refresh_token);
       queryClient.invalidateQueries({ queryKey: authKeys.all });
     },
@@ -99,7 +96,7 @@ export const useAuth = () => {
     } catch (error) {
       console.warn("[useAuth] Server logout failed:", error); // Ignore server errors
     } finally {
-      await clearTokens();
+      // Zustand persist handles secure storage cleanup automatically
       logoutStore();
       queryClient.removeQueries({ queryKey: authKeys.all });
     }

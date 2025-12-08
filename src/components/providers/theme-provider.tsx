@@ -1,14 +1,14 @@
 import React, {
   createContext,
+  useCallback,
   useContext,
-  useState,
   useEffect,
   useMemo,
-  useCallback,
+  useState,
 } from "react";
 import { useColorScheme } from "react-native";
 
-import { getDB } from "@/shared/database";
+import { settingsQueries } from "@/database";
 
 export type Theme = "light" | "dark" | "system";
 
@@ -123,23 +123,20 @@ export const ThemeProvider = ({
 }: ThemeProviderProps) => {
   const deviceTheme = useColorScheme();
   const [theme, setThemeState] = useState<Theme>(defaultTheme);
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Load theme from SQLite on mount
+  // Load theme from SQLite in background (non-blocking)
   useEffect(() => {
     async function loadTheme() {
       try {
-        const db = await getDB();
-        const result = await db.getFirstAsync<{ value: string }>(
-          "SELECT value FROM settings WHERE key = 'theme'"
-        );
-        if (result?.value) {
-          setThemeState(result.value as Theme);
+        const saved = await settingsQueries.get("theme");
+        if (
+          saved &&
+          (saved === "light" || saved === "dark" || saved === "system")
+        ) {
+          setThemeState(saved);
         }
       } catch (error) {
         console.log("Could not load theme from database:", error);
-      } finally {
-        setIsLoading(false);
       }
     }
     loadTheme();
@@ -156,11 +153,7 @@ export const ThemeProvider = ({
     setThemeState(newTheme);
     // Save to SQLite
     try {
-      const db = await getDB();
-      await db.runAsync(
-        "INSERT OR REPLACE INTO settings (key, value) VALUES ('theme', ?)",
-        [newTheme]
-      );
+      await settingsQueries.set("theme", newTheme);
     } catch (error) {
       console.error("Could not save theme to database:", error);
     }
@@ -177,11 +170,8 @@ export const ThemeProvider = ({
     [theme, colors, setTheme, isDark]
   );
 
-  // Don't render children until theme is loaded
-  if (isLoading) {
-    return null;
-  }
-
+  // NON-BLOCKING: Render children immediately with system/default theme
+  // Theme will update once loaded from DB (usually imperceptible)
   return (
     <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
   );

@@ -157,4 +157,18 @@ export const mindmapQueries = {
       connections: connections.filter((c) => c.mindmap_id === m.id),
     }));
   },
+
+  // Batch lookup by IDs returning Map (for sync pullChanges optimization)
+  async getByLocalIds(ids: string[]): Promise<Map<string, MindMapRow>> {
+    if (ids.length === 0) return new Map();
+    const db = await getDB();
+    const placeholders = ids.map(() => "?").join(",");
+
+    const rows = await db.getAllAsync<MindMapRow>(
+      `SELECT * FROM mindmaps WHERE id IN (${placeholders})`,
+      ids
+    );
+
+    return new Map(rows.map((r) => [r.id, r]));
+  },
 };

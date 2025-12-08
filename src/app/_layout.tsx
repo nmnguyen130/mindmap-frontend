@@ -13,11 +13,9 @@ import { ModalProvider } from "@/components/providers/modal-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AuthProvider } from "@/features/auth";
 import { AuthenticatedSyncWrapper } from "@/features/sync";
-import { queryClient } from "@/shared/api/client";
-import { getDB } from "@/shared/database";
+import { queryClient } from "@/lib/query-client";
 
-// Initialize database
-getDB().catch(console.error);
+// DB initializes lazily on first query (ThemeProvider loads settings)
 
 const RootLayout = () => {
   return (

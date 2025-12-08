@@ -9,3 +9,4 @@ export { mindmapQueries } from "./queries/mindmap";
 export { nodeQueries } from "./queries/node";
 export { connectionQueries } from "./queries/connection";
 export { changeQueries } from "./queries/change";
+export { settingsQueries } from "./queries/settings";

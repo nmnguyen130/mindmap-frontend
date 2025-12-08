@@ -17,4 +17,5 @@ export { useAuthStore } from "./store/auth-store";
 export type { User } from "./store/auth-store";
 
 // Utilities
-export { clearTokens, saveTokens } from "./utils/secure-storage";
+export { secureStorage } from "./utils/secure-storage";
+export { decodeJWT, isTokenExpired, getUserFromToken } from "./utils/jwt-utils";

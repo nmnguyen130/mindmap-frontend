@@ -1,10 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  mindmapQueries,
-  nodeQueries,
-  connectionQueries,
-} from "@/shared/database";
-import type { MindMapRow } from "@/shared/database";
+import type { MindMapRow } from "@/database";
+import { connectionQueries, mindmapQueries, nodeQueries } from "@/database";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 // Query keys factory
 export const mindmapKeys = {

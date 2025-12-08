@@ -55,12 +55,22 @@ export const nodeQueries = {
     updates: Partial<
       Pick<
         MindMapNodeRow,
-        "label" | "keywords" | "level" | "parent_id" | "position_x" | "position_y" | "notes"
+        | "label"
+        | "keywords"
+        | "level"
+        | "parent_id"
+        | "position_x"
+        | "position_y"
+        | "notes"
       >
     >
   ): Promise<void> {
     const db = await getDB();
-    const sets: string[] = ["updated_at = ?", "version = version + 1", "is_synced = 0"];
+    const sets: string[] = [
+      "updated_at = ?",
+      "version = version + 1",
+      "is_synced = 0",
+    ];
     const values: (string | number | null)[] = [now()];
 
     if (updates.label !== undefined) {
@@ -121,18 +131,21 @@ export const nodeQueries = {
     const timestamp = now();
 
     await db.withTransactionAsync(async () => {
+      const stmt = await db.prepareAsync(
+        `UPDATE mindmap_nodes SET 
+          position_x = ?, 
+          position_y = ?, 
+          updated_at = ?, 
+          version = version + 1, 
+          is_synced = 0 
+        WHERE id = ? AND deleted_at IS NULL`
+      );
+
       for (const { id, x, y } of updates) {
-        await db.runAsync(
-          `UPDATE mindmap_nodes SET 
-            position_x = ?, 
-            position_y = ?, 
-            updated_at = ?, 
-            version = version + 1, 
-            is_synced = 0 
-          WHERE id = ? AND deleted_at IS NULL`,
-          [x, y, timestamp, id]
-        );
+        await stmt.executeAsync([x, y, timestamp, id]);
       }
+
+      await stmt.finalizeAsync();
     });
   },
 

@@ -2,8 +2,9 @@
 export { SyncProvider } from "./providers/sync-provider";
 export { AuthenticatedSyncWrapper } from "./providers/authenticated-sync-wrapper";
 
-// Service
+// Services
 export { syncService } from "./services/sync-service";
+export { SyncController } from "./services/sync-controller";
 
 // Store
 export {

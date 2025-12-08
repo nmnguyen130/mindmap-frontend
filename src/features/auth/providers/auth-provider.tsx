@@ -1,13 +1,19 @@
-import { ReactNode, useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
-import { authApi } from '../services/auth-api';
-import { selectAccessToken, selectHasHydrated, selectRefreshToken, useAuthStore } from '../store/auth-store';
-import { clearTokens, saveTokens } from '../utils/secure-storage';
+import { ReactNode, useEffect, useState } from "react";
+import { ActivityIndicator, Text, View } from "react-native";
+
+import { authApi } from "../services/auth-api";
+import {
+  selectAccessToken,
+  selectHasHydrated,
+  selectRefreshToken,
+  useAuthStore,
+} from "../store/auth-store";
+import { getUserFromToken, isTokenExpired } from "../utils/jwt-utils";
 
 /**
  * Handles auth initialization:
  * - Zustand hydration
- * - Token validation & auto refresh
+ * - JWT validation & auto refresh
  * Runs ONCE on mount; React Query handles global refetches
  */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -25,32 +31,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!hasHydrated) return;
 
     const initializeAuth = async () => {
-      // No tokens: skip to login screen.
+      // No tokens: skip to login screen
       if (!accessToken || !refreshToken) {
         setIsInitializing(false);
         return;
       }
 
-      try {
-        // Validate with current access token.
-        const user = await authApi.getMe({ accessToken });
-        setAuth(user, accessToken, refreshToken);
-      } catch {
-        // Access expired: attempt refresh.
-        try {
-          const { access_token, refresh_token } = await authApi.refreshTokens({ refreshToken });
-          await saveTokens(access_token, refresh_token);
-          setTokens(access_token, refresh_token);
-
-          // Fetch user with new tokens.
-          const user = await authApi.getMe({ accessToken: access_token });
-          setAuth(user, access_token, refresh_token);
-        } catch {
-          // Refresh failed: invalid session, force logout.
-          console.warn('[AuthProvider] Session invalid, logging out');
-          await clearTokens();
-          logoutStore();
+      // Token not expired: decode JWT and use directly (no API call)
+      if (!isTokenExpired(accessToken)) {
+        const user = getUserFromToken(accessToken);
+        if (user) {
+          setAuth(user, accessToken, refreshToken);
+          setIsInitializing(false);
+          return;
         }
+      }
+
+      // Token expired: attempt refresh
+      try {
+        const { access_token, refresh_token } = await authApi.refreshTokens({
+          refreshToken,
+        });
+        const user = getUserFromToken(access_token);
+        if (user) {
+          setAuth(user, access_token, refresh_token);
+        } else {
+          throw new Error("Invalid token payload");
+        }
+      } catch {
+        console.warn("[AuthProvider] Session invalid, logging out");
+        logoutStore();
       } finally {
         setIsInitializing(false);
       }
@@ -59,7 +69,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     initializeAuth();
   }, [hasHydrated]);
 
-  // Loading screen during hydration/init (Expo splash fallback).
+  // Loading screen during hydration/init
   if (!hasHydrated || isInitializing) {
     return (
       <View className="flex-1 justify-center items-center bg-black">
