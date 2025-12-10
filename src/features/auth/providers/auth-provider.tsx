@@ -1,80 +1,22 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 
-import { authApi } from "../services/auth-api";
-import {
-  selectAccessToken,
-  selectHasHydrated,
-  selectRefreshToken,
-  useAuthStore,
-} from "../store/auth-store";
-import { getUserFromToken, isTokenExpired } from "../utils/jwt-utils";
+import { useInitAuth } from "../hooks/use-init-auth";
 
 /**
- * Handles auth initialization:
- * - Zustand hydration
- * - JWT validation & auto refresh
- * Runs ONCE on mount; React Query handles global refetches
+ * Minimal wrapper for auth loading state.
+ * Shows spinner during hydration/validation.
  */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const accessToken = useAuthStore(selectAccessToken);
-  const refreshToken = useAuthStore(selectRefreshToken);
-  const hasHydrated = useAuthStore(selectHasHydrated);
+  const { isReady, status } = useInitAuth();
 
-  const setAuth = useAuthStore((s) => s.setAuth);
-  const setTokens = useAuthStore((s) => s.setTokens);
-  const logoutStore = useAuthStore((s) => s.logout);
-
-  const [isInitializing, setIsInitializing] = useState(true);
-
-  useEffect(() => {
-    if (!hasHydrated) return;
-
-    const initializeAuth = async () => {
-      // No tokens: skip to login screen
-      if (!accessToken || !refreshToken) {
-        setIsInitializing(false);
-        return;
-      }
-
-      // Token not expired: decode JWT and use directly (no API call)
-      if (!isTokenExpired(accessToken)) {
-        const user = getUserFromToken(accessToken);
-        if (user) {
-          setAuth(user, accessToken, refreshToken);
-          setIsInitializing(false);
-          return;
-        }
-      }
-
-      // Token expired: attempt refresh
-      try {
-        const { access_token, refresh_token } = await authApi.refreshTokens({
-          refreshToken,
-        });
-        const user = getUserFromToken(access_token);
-        if (user) {
-          setAuth(user, access_token, refresh_token);
-        } else {
-          throw new Error("Invalid token payload");
-        }
-      } catch {
-        console.warn("[AuthProvider] Session invalid, logging out");
-        logoutStore();
-      } finally {
-        setIsInitializing(false);
-      }
-    };
-
-    initializeAuth();
-  }, [hasHydrated]);
-
-  // Loading screen during hydration/init
-  if (!hasHydrated || isInitializing) {
+  if (!isReady) {
     return (
-      <View className="flex-1 justify-center items-center bg-black">
+      <View className="flex-1 items-center justify-center bg-background">
         <ActivityIndicator size="large" color="#3b82f6" />
-        <Text className="mt-4 text-gray-400 text-sm">Loading...</Text>
+        <Text className="mt-4 text-sm text-muted-foreground">
+          {status === "hydrating" ? "Restoring session..." : "Validating..."}
+        </Text>
       </View>
     );
   }

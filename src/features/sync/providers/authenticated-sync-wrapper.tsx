@@ -2,7 +2,7 @@ import React from "react";
 
 import {
   useAuthStore,
-  selectIsAuthenticated,
+  selectAccessToken,
 } from "@/features/auth/store/auth-store";
 import { SyncProvider } from "./sync-provider";
 
@@ -21,7 +21,8 @@ interface AuthenticatedSyncWrapperProps {
 export const AuthenticatedSyncWrapper: React.FC<
   AuthenticatedSyncWrapperProps
 > = ({ children }) => {
-  const isAuthenticated = useAuthStore(selectIsAuthenticated);
+  const accessToken = useAuthStore(selectAccessToken);
+  const isAuthenticated = !!accessToken;
 
   if (!isAuthenticated) {
     // Not authenticated - render children directly without sync

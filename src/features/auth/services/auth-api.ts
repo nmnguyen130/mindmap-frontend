@@ -1,70 +1,69 @@
-import { API_BASE_URL } from "@/constants/config";
-import type { User } from "../store/auth-store";
+import { fetchApi, unwrapResult } from "@/lib/fetch-client";
 
-// Auth API helper
+// Types
+export interface User {
+  id: string;
+  email: string;
+}
+
 export interface AuthResponse {
   access_token: string;
   refresh_token: string;
   user: User;
 }
 
-// Generic API helper with JSON parsing and error handling
-const api = async (endpoint: string, options?: RequestInit) => {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options?.headers ?? {}),
-    },
-  });
+export interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+}
 
-  const json = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(json.message || "Request failed");
-  }
-  return json.data;
-};
+// Re-export for convenience
+export type { ApiResult } from "@/lib/fetch-client";
 
 // Auth API service
 export const authApi = {
-  // Login with email/password
   login: ({ email, password }: { email: string; password: string }) =>
-    api("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    }) as Promise<AuthResponse>,
+    unwrapResult(
+      fetchApi<AuthResponse>("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      })
+    ),
 
-  // Register new user
   register: ({ email, password }: { email: string; password: string }) =>
-    api("/api/auth/register", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    }) as Promise<AuthResponse>,
+    unwrapResult(
+      fetchApi<AuthResponse>("/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      })
+    ),
 
-  // Get current user (requires access token)
   getMe: ({ accessToken }: { accessToken: string }) =>
-    api("/api/auth/me", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    }) as Promise<User>,
+    unwrapResult(
+      fetchApi<User>("/api/auth/me", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+    ),
 
-  // Refresh access token
   refreshTokens: ({ refreshToken }: { refreshToken: string }) =>
-    api("/api/auth/refresh", {
-      method: "POST",
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    }) as Promise<{ access_token: string; refresh_token: string }>,
+    unwrapResult(
+      fetchApi<TokenResponse>("/api/auth/refresh", {
+        method: "POST",
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      })
+    ),
 
-  // Logout (server-side)
-  logout: () => api("/api/auth/logout", { method: "POST" }).catch(() => { }),
+  logout: () =>
+    fetchApi("/api/auth/logout", { method: "POST" }).catch(() => {}),
 
-  // Request password reset email
   forgotPassword: ({ email }: { email: string }) =>
-    api("/api/auth/forgot-password", {
-      method: "POST",
-      body: JSON.stringify({ email }),
-    }),
+    unwrapResult(
+      fetchApi("/api/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      })
+    ),
 
-  // Reset password with token
   resetPassword: ({
     accessToken,
     password,
@@ -72,19 +71,21 @@ export const authApi = {
     accessToken: string;
     password: string;
   }) =>
-    api("/api/auth/reset-password", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({ password }),
-    }),
+    unwrapResult(
+      fetchApi("/api/auth/reset-password", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ password }),
+      })
+    ),
 
-  // Initiate social login
   socialLogin: ({ provider }: { provider: "google" | "facebook" }) =>
-    api(`/api/auth/social/${provider}`, {
-      method: "POST",
-    }) as Promise<{ url: string }>,
+    unwrapResult(
+      fetchApi<{ url: string }>(`/api/auth/social/${provider}`, {
+        method: "POST",
+      })
+    ),
 
-  // Handle OAuth callback and fetch user
   handleOAuthCallback: async ({
     accessToken,
     refreshToken,

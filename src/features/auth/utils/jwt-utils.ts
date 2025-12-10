@@ -1,3 +1,5 @@
+import { decode } from "base-64";
+
 export interface JWTPayload {
   sub: string; // user_id
   email?: string;
@@ -14,9 +16,9 @@ export function decodeJWT(token: string): JWTPayload | null {
     const [, payload] = token.split(".");
     if (!payload) return null;
 
-    // Base64URL decode
+    // Base64URL → Base64 → decode
     const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = atob(base64);
+    const jsonPayload = decode(base64);
     return JSON.parse(jsonPayload);
   } catch {
     return null;
