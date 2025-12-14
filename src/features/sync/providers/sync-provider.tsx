@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 
 import { SyncController } from "../services/sync-controller";
 import { useAuthStore } from "@/features/auth/store/auth-store";
-import { ConflictModal } from "@/components/sync/conflict-modal";
+import { ConflictModal } from "@/components/ui/modal/conflict-modal";
 
 interface SyncProviderProps {
   children: React.ReactNode;

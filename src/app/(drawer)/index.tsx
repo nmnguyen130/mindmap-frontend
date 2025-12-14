@@ -1,17 +1,23 @@
-import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
-import { Link, router, useNavigation } from 'expo-router';
-import { useEffect, useMemo, useCallback } from 'react';
-import { DrawerActions } from '@react-navigation/native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import {
+  View,
+  Text,
+  ScrollView,
+  ActivityIndicator,
+  RefreshControl,
+} from "react-native";
+import { Link, router, useNavigation } from "expo-router";
+import { useEffect, useMemo, useCallback, useState } from "react";
+import { DrawerActions } from "@react-navigation/native";
+import { MaterialIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 
-import Header from '@/components/layout/header';
-import { useMindmaps, fullMindmapToUI } from '@/features/mindmap';
-import { useAuth } from '@/features/auth';
-import { useTheme } from '@/components/providers/theme-provider';
-import ActionButton from '@/components/ui/action-button';
-import StatisticsCard from '@/components/home/statistics-card';
-import MindMapCard from '@/components/home/mindmap-card';
+import Header from "@/components/layout/header";
+import { useMindmaps, fullMindmapToUI } from "@/features/mindmap";
+import { useAuth } from "@/features/auth";
+import { useTheme } from "@/components/providers/theme-provider";
+import ActionButton from "@/components/ui/action-button";
+import StatisticsCard from "@/components/home/statistics-card";
+import MindMapCard from "@/components/home/mindmap-card";
 
 // ============================================================================
 // Component
@@ -19,20 +25,22 @@ import MindMapCard from '@/components/home/mindmap-card';
 
 const HomeScreen = () => {
   // TanStack Query hook - reads from SQLite
-  const { data: mindmapRows = [], isLoading, error, refetch } = useMindmaps();
+  const { mindmaps, isLoading, error, refetch } = useMindmaps();
   const { user, isAuthenticated } = useAuth();
   const { colors, isDark } = useTheme();
   const navigation = useNavigation();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Convert DB rows to UI-friendly format
-  const maps = useMemo(() => 
-    mindmapRows.map(row => ({
-      id: row.id,
-      title: row.title,
-      updatedAt: new Date(row.updated_at),
-      nodeCount: 0, // We don't load nodes for list view
-    })),
-    [mindmapRows]
+  const maps = useMemo(
+    () =>
+      mindmaps.map((row) => ({
+        id: row.id,
+        title: row.title,
+        updatedAt: new Date(row.updated_at),
+        nodeCount: 0, // We don't load nodes for list view
+      })),
+    [mindmaps]
   );
 
   // Calculate statistics with memoization
@@ -49,9 +57,19 @@ const HomeScreen = () => {
     void refetch();
   }, [refetch]);
 
+  // Pull-to-refresh handler
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refetch]);
+
   // Memoized handlers
   const handleCreateMindMap = useCallback(() => {
-    router.push('/mindmap/create');
+    router.push("/mindmap/create");
   }, []);
 
   const handleOpenMindMap = useCallback((id: string) => {
@@ -59,7 +77,7 @@ const HomeScreen = () => {
   }, []);
 
   const handleOpenDemoMindMap = useCallback(() => {
-    router.push('/mindmap/default');
+    router.push("/mindmap/default");
   }, []);
 
   const handleMenuPress = useCallback(() => {
@@ -68,21 +86,33 @@ const HomeScreen = () => {
 
   // Gradient colors for different themes
   const heroGradient: [string, string] = isDark
-    ? ['#1e3a8a', '#312e81']
-    : ['#3b82f6', '#8b5cf6'];
+    ? ["#1e3a8a", "#312e81"]
+    : ["#3b82f6", "#8b5cf6"];
 
   const statGradients: [string, string][] = [
-    isDark ? ['#0891b2', '#0e7490'] : ['#06b6d4', '#0891b2'],
-    isDark ? ['#7c3aed', '#6d28d9'] : ['#8b5cf6', '#7c3aed'],
-    isDark ? ['#059669', '#047857'] : ['#10b981', '#059669'],
+    isDark ? ["#0891b2", "#0e7490"] : ["#06b6d4", "#0891b2"],
+    isDark ? ["#7c3aed", "#6d28d9"] : ["#8b5cf6", "#7c3aed"],
+    isDark ? ["#059669", "#047857"] : ["#10b981", "#059669"],
   ];
 
-  const accentColors = ['#06b6d4', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981'];
+  const accentColors = ["#06b6d4", "#8b5cf6", "#f59e0b", "#ef4444", "#10b981"];
 
   return (
     <View className="flex-1" style={{ backgroundColor: colors.background }}>
       <Header title="Mind Mapping" onMenuPress={handleMenuPress} />
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+            progressBackgroundColor={colors.surface}
+          />
+        }
+      >
         <View className="pb-5">
           {/* Hero Section with Gradient */}
           <LinearGradient
@@ -93,25 +123,26 @@ const HomeScreen = () => {
           >
             <Text
               className="text-xs font-semibold uppercase mb-2 tracking-wider"
-              style={{ color: 'rgba(255,255,255,0.8)' }}
+              style={{ color: "rgba(255,255,255,0.8)" }}
             >
-              {isAuthenticated ? 'Welcome Back' : 'Welcome'}
+              {isAuthenticated ? "Welcome Back" : "Welcome"}
             </Text>
 
             <Text
               className="text-3xl font-bold mb-2"
-              style={{ color: '#ffffff' }}
+              style={{ color: "#ffffff" }}
             >
               {isAuthenticated && user?.email
-                ? user.email.split('@')[0]
-                : 'Mind Mapping'}
+                ? user.email.split("@")[0]
+                : "Mind Mapping"}
             </Text>
 
             <Text
               className="text-sm leading-5"
-              style={{ color: 'rgba(255,255,255,0.9)' }}
+              style={{ color: "rgba(255,255,255,0.9)" }}
             >
-              Capture, organize, and connect your ideas with powerful AI-assisted mind mapping
+              Capture, organize, and connect your ideas with powerful
+              AI-assisted mind mapping
             </Text>
           </LinearGradient>
 
@@ -177,7 +208,7 @@ const HomeScreen = () => {
                     description="Manage data"
                     icon="storage"
                     variant="warning"
-                    onPress={() => router.push('/mindmap/store-manager')}
+                    onPress={() => router.push("/mindmap/store-manager")}
                   />
                 </View>
               </View>
@@ -187,10 +218,10 @@ const HomeScreen = () => {
                   className="flex-row items-center justify-center rounded-xl px-4 py-3"
                   style={{
                     backgroundColor: isDark
-                      ? 'rgba(59, 130, 246, 0.1)'
-                      : 'rgba(59, 130, 246, 0.05)',
+                      ? "rgba(59, 130, 246, 0.1)"
+                      : "rgba(59, 130, 246, 0.05)",
                     borderWidth: 1,
-                    borderColor: colors.primary + '40',
+                    borderColor: colors.primary + "40",
                   }}
                 >
                   <MaterialIcons
@@ -227,12 +258,16 @@ const HomeScreen = () => {
               <View
                 className="p-4 rounded-xl mb-4 flex-row items-center"
                 style={{
-                  backgroundColor: colors.error + '15',
+                  backgroundColor: colors.error + "15",
                   borderWidth: 1,
-                  borderColor: colors.error + '40',
+                  borderColor: colors.error + "40",
                 }}
               >
-                <MaterialIcons name="error-outline" size={20} color={colors.error} />
+                <MaterialIcons
+                  name="error-outline"
+                  size={20}
+                  color={colors.error}
+                />
                 <Text
                   className="flex-1 ml-3 text-sm"
                   style={{ color: colors.error }}
@@ -269,15 +304,15 @@ const HomeScreen = () => {
                       backgroundColor: colors.surface,
                       borderWidth: 1,
                       borderColor: colors.border,
-                      borderStyle: 'dashed',
+                      borderStyle: "dashed",
                     }}
                   >
                     <View
                       className="w-20 h-20 rounded-full items-center justify-center mb-4"
                       style={{
                         backgroundColor: isDark
-                          ? 'rgba(59, 130, 246, 0.1)'
-                          : 'rgba(59, 130, 246, 0.05)',
+                          ? "rgba(59, 130, 246, 0.1)"
+                          : "rgba(59, 130, 246, 0.05)",
                       }}
                     >
                       <MaterialIcons

@@ -22,18 +22,18 @@ const RootLayout = () => {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <AuthenticatedSyncWrapper>
-              <ThemeProvider>
+          <ThemeProvider>
+            <AuthProvider>
+              <AuthenticatedSyncWrapper>
                 <ModalProvider>
                   <Stack screenOptions={{ headerShown: false }}>
                     <Stack.Screen name="(drawer)" />
                     <Stack.Screen name="(auth)" />
                   </Stack>
                 </ModalProvider>
-              </ThemeProvider>
-            </AuthenticatedSyncWrapper>
-          </AuthProvider>
+              </AuthenticatedSyncWrapper>
+            </AuthProvider>
+          </ThemeProvider>
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

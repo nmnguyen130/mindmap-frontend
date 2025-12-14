@@ -4,7 +4,6 @@ import { getDB } from "@/database/client";
 import { fetchWithAuth } from "@/features/auth";
 
 import type { ConflictItem } from "../store/sync-store";
-import { useSyncStore } from "../store/sync-store";
 
 export interface SyncResult {
   success: boolean;
@@ -47,13 +46,11 @@ class SyncService {
   /**
    * Main sync: push local, then pull remote.
    * Token is fetched from store by fetchWithAuth on each request.
+   *
+   * Note: Callers (SyncController, SyncStatusIndicator) are responsible for
+   * managing the isSyncing state to prevent concurrent calls.
    */
   async sync(): Promise<SyncResult> {
-    const { isSyncing } = useSyncStore.getState();
-    if (isSyncing) {
-      return { success: false, synced: 0, failed: 0, conflicts: [] };
-    }
-
     let synced = 0;
     let failed = 0;
     const conflictItems: ConflictItem[] = [];

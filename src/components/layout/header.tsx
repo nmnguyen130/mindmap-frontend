@@ -9,6 +9,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTheme } from "@/components/providers/theme-provider";
+import { SyncStatusIndicator } from "@/components/sync-status";
 
 interface HeaderProps {
   title: string;
@@ -102,32 +103,36 @@ const Header = ({
             </Text>
           </View>
 
-          {/* Right Action */}
-          {rightAction ? (
-            <Animated.View style={rightAnimatedStyle}>
-              <Pressable
-                onPress={rightAction.onPress}
-                onPressIn={handleRightPressIn}
-                onPressOut={handleRightPressOut}
-                className="w-10 h-10 rounded-full justify-center items-center"
-                style={{ backgroundColor: colors.surface }}
-                accessibilityLabel="Action button"
-                accessibilityRole="button"
-              >
-                <MaterialIcons
-                  name={rightAction.icon}
-                  size={24}
-                  color={colors.primary}
-                />
-              </Pressable>
-            </Animated.View>
-          ) : (
-            <View className="w-10 h-10" />
-          )}
+          {/* Right Section - Sync Status + Optional Action */}
+          <View className="flex-row items-center gap-2">
+            {/* Sync Status Indicator */}
+            <SyncStatusIndicator />
+
+            {/* Optional Right Action */}
+            {rightAction && (
+              <Animated.View style={rightAnimatedStyle}>
+                <Pressable
+                  onPress={rightAction.onPress}
+                  onPressIn={handleRightPressIn}
+                  onPressOut={handleRightPressOut}
+                  className="w-10 h-10 rounded-full justify-center items-center"
+                  style={{ backgroundColor: colors.surface }}
+                  accessibilityLabel="Action button"
+                  accessibilityRole="button"
+                >
+                  <MaterialIcons
+                    name={rightAction.icon}
+                    size={24}
+                    color={colors.primary}
+                  />
+                </Pressable>
+              </Animated.View>
+            )}
+          </View>
         </View>
       </View>
     </>
   );
-}
+};
 
 export default Header;

@@ -1,14 +1,15 @@
+import * as Crypto from "expo-crypto";
+import * as DocumentPicker from "expo-document-picker";
 import { router } from "expo-router";
 import { useState } from "react";
-import * as DocumentPicker from "expo-document-picker";
 import { Alert, Pressable, Text, TextInput, View } from "react-native";
 
 import Header from "@/components/layout/header";
-import FormScreen from "@/components/ui/form-screen";
 import SourceDocumentSection from "@/components/mindmap/create/source-document-section";
 import { useTheme } from "@/components/providers/theme-provider";
-import { useMindmaps } from "@/features/mindmap";
+import FormScreen from "@/components/ui/form-screen";
 import { useCreateFromPdf } from "@/features/document/hooks/use-pdf-upload";
+import { useMindmaps } from "@/features/mindmap";
 
 interface SelectedFile {
   name: string;
@@ -118,8 +119,8 @@ const CreateMindMapScreen = () => {
         }
       } else {
         // Flow B: Without PDF - Create blank mindmap locally
-        const newId = crypto.randomUUID();
-        const rootNodeId = `node-${Date.now()}`;
+        const newId = Crypto.randomUUID();
+        const rootNodeId = Crypto.randomUUID();
 
         await create.mutateAsync({
           id: newId,

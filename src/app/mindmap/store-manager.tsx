@@ -1,4 +1,5 @@
 import { MaterialIcons } from "@expo/vector-icons";
+import * as Crypto from "expo-crypto";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -32,8 +33,11 @@ const StoreManagerScreen = () => {
   };
 
   const handleCreateTest = async () => {
-    const timestamp = Date.now();
-    const id = `test-${timestamp}`;
+    // Generate proper UUIDs using expo-crypto (React Native compatible)
+    const id = Crypto.randomUUID();
+    const node1Id = Crypto.randomUUID();
+    const node2Id = Crypto.randomUUID();
+    const edgeId = Crypto.randomUUID();
 
     addLog("Creating test mindmap...");
 
@@ -45,31 +49,31 @@ const StoreManagerScreen = () => {
         summary: "Created via Store Manager",
         nodes: [
           {
-            id: `node1-${timestamp}`,
+            id: node1Id,
             label: "Central Node",
             keywords: ["main"],
             level: 0,
             position: { x: 0, y: 0 },
           },
           {
-            id: `node2-${timestamp}`,
+            id: node2Id,
             label: "Child Node",
             keywords: ["child"],
             level: 1,
-            parent_id: `node1-${timestamp}`,
+            parent_id: node1Id,
             position: { x: 200, y: 0 },
           },
         ],
         edges: [
           {
-            id: `edge1-${timestamp}`,
-            from: `node1-${timestamp}`,
-            to: `node2-${timestamp}`,
+            id: edgeId,
+            from: node1Id,
+            to: node2Id,
           },
         ],
       });
 
-      addLog(`✅ Created: ${id}`);
+      addLog(`✅ Created: ${id.slice(0, 8)}...`);
     } catch (err) {
       addLog(`❌ Failed: ${err instanceof Error ? err.message : String(err)}`);
     }

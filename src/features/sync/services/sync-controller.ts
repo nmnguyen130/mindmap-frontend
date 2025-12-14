@@ -86,7 +86,6 @@ export class SyncController {
 
   /** Run sync once (main tick) */
   async tick(): Promise<void> {
-    // Still check for auth before syncing (avoids unnecessary sync attempts)
     const accessToken = this.config.getAccessToken();
     if (!accessToken) return;
 
@@ -98,13 +97,13 @@ export class SyncController {
 
     setSyncing(true);
     try {
-      // sync() now gets fresh token from store via fetchWithAuth
       const result = await syncService.sync();
       setSyncResult(result);
       const count = await syncService.getPendingChangesCount();
       setPendingChanges(count);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Sync failed";
+      console.error("[SyncController] Sync failed:", message);
       setSyncError(message);
     } finally {
       setSyncing(false);

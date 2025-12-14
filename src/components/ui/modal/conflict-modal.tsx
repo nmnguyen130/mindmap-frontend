@@ -1,10 +1,6 @@
 import { useTheme } from "@/components/providers/theme-provider";
 import Modal from "@/components/ui/modal/modal";
 import { mindmapQueries } from "@/database";
-import {
-  selectAccessToken,
-  useAuthStore,
-} from "@/features/auth/store/auth-store";
 import { syncService } from "@/features/sync/services/sync-service";
 import {
   selectConflictItems,
@@ -136,7 +132,6 @@ export function ConflictModal() {
     (state) => state.setShowConflictModal
   );
   const clearConflicts = useSyncStore((state) => state.clearConflicts);
-  const accessToken = useAuthStore(selectAccessToken);
   const queryClient = useQueryClient();
 
   const handleKeepLocal = useCallback(
@@ -153,20 +148,19 @@ export function ConflictModal() {
   const handleUseRemote = useCallback(
     async (conflict: ConflictItem) => {
       // Use remote version - trigger a re-pull for this specific mindmap
-      if (accessToken) {
-        try {
-          // For now, just resolve the conflict and let next sync handle it
-          // The local will accept remote version since we're resolving the conflict
-          resolveConflict(conflict.id);
-          // Trigger a re-sync to pull remote changes
-          await syncService.sync(accessToken);
-          queryClient.invalidateQueries({ queryKey: ["mindmaps"] });
-        } catch (error) {
-          console.error("[ConflictModal] Error using remote:", error);
-        }
+      try {
+        // Resolve the conflict first and let next sync handle it
+        // The local will accept remote version since we're resolving the conflict
+        resolveConflict(conflict.id);
+        // Trigger a re-sync to pull remote changes
+        // syncService.sync() uses fetchWithAuth internally for authentication
+        await syncService.sync();
+        queryClient.invalidateQueries({ queryKey: ["mindmaps"] });
+      } catch (error) {
+        console.error("[ConflictModal] Error using remote:", error);
       }
     },
-    [accessToken, resolveConflict, queryClient]
+    [resolveConflict, queryClient]
   );
 
   const handleClose = useCallback(() => {
