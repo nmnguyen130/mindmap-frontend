@@ -11,12 +11,8 @@ interface AuthenticatedSyncWrapperProps {
 }
 
 /**
- * AuthenticatedSyncWrapper conditionally renders SyncProvider only when authenticated.
- *
- * Benefits:
- * - Zero coupling between Auth and Sync
- * - No race conditions (SyncProvider only mounts when token exists)
- * - Easy to test
+ * Conditionally renders SyncProvider only when authenticated.
+ * Prevents SyncProvider from mounting before auth hydration completes.
  */
 export const AuthenticatedSyncWrapper: React.FC<
   AuthenticatedSyncWrapperProps

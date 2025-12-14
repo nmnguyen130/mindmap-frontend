@@ -86,6 +86,7 @@ export class SyncController {
 
   /** Run sync once (main tick) */
   async tick(): Promise<void> {
+    // Still check for auth before syncing (avoids unnecessary sync attempts)
     const accessToken = this.config.getAccessToken();
     if (!accessToken) return;
 
@@ -97,7 +98,8 @@ export class SyncController {
 
     setSyncing(true);
     try {
-      const result = await syncService.sync(accessToken);
+      // sync() now gets fresh token from store via fetchWithAuth
+      const result = await syncService.sync();
       setSyncResult(result);
       const count = await syncService.getPendingChangesCount();
       setPendingChanges(count);

@@ -2,15 +2,15 @@ import { useTheme } from "@/components/providers/theme-provider";
 import Modal from "@/components/ui/modal/modal";
 import { mindmapQueries } from "@/database";
 import {
-    selectAccessToken,
-    useAuthStore,
+  selectAccessToken,
+  useAuthStore,
 } from "@/features/auth/store/auth-store";
 import { syncService } from "@/features/sync/services/sync-service";
 import {
-    selectConflictItems,
-    selectShowConflictModal,
-    useSyncStore,
-    type ConflictItem,
+  selectConflictItems,
+  selectShowConflictModal,
+  useSyncStore,
+  type ConflictItem,
 } from "@/features/sync/store/sync-store";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";

@@ -1,22 +1,27 @@
-import { ReactNode } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ReactNode, useEffect, useState } from "react";
+import { ActivityIndicator, View } from "react-native";
 
-import { useInitAuth } from "../hooks/use-init-auth";
+import { useAuthStore } from "../store/auth-store";
 
 /**
- * Minimal wrapper for auth loading state.
- * Shows spinner during hydration/validation.
+ * Auth provider that waits for Zustand hydration.
+ * Shows spinner until tokens are loaded from SecureStore.
  */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const { isReady, status } = useInitAuth();
+  const [isReady, setIsReady] = useState(useAuthStore.persist.hasHydrated());
+
+  useEffect(() => {
+    if (isReady) return;
+    const unsub = useAuthStore.persist.onFinishHydration(() =>
+      setIsReady(true)
+    );
+    return unsub;
+  }, [isReady]);
 
   if (!isReady) {
     return (
       <View className="flex-1 items-center justify-center bg-background">
         <ActivityIndicator size="large" color="#3b82f6" />
-        <Text className="mt-4 text-sm text-muted-foreground">
-          {status === "hydrating" ? "Restoring session..." : "Validating..."}
-        </Text>
       </View>
     );
   }
