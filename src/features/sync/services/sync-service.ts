@@ -4,7 +4,9 @@ import { getDB } from "@/database/client";
 import { fetchWithAuth } from "@/features/auth";
 
 import type { ConflictItem } from "../store/sync-store";
+import type { SQLiteDatabase } from "expo-sqlite";
 
+// TYPES
 export interface SyncResult {
   success: boolean;
   synced: number;
@@ -12,30 +14,38 @@ export interface SyncResult {
   conflicts: ConflictItem[];
 }
 
+/** Remote mindmap response - aligned with backend schema */
 interface RemoteMindmap {
   id: string;
   title: string;
-  central_topic?: string;
-  summary?: string;
-  document_id?: string;
+  central_topic: string | null;
+  summary: string | null;
+  document_id: string | null;
   version: number;
-  created_at?: number;
-  updated_at?: number;
-  nodes?: {
-    id: string;
-    label: string;
-    keywords?: string[];
-    level?: number;
-    parent_id?: string;
-    position?: { x: number; y: number };
-    notes?: string;
-  }[];
-  connections?: {
-    id: string;
-    from: string;
-    to: string;
-    relationship?: string;
-  }[];
+  created_at: number;
+  updated_at: number;
+  nodes?: RemoteNode[];
+  connections?: RemoteConnection[];
+}
+
+interface RemoteNode {
+  id: string;
+  label: string;
+  keywords: string | null;
+  level: number;
+  parent_id: string | null;
+  position_x: number;
+  position_y: number;
+  notes: string | null;
+  version: number;
+}
+
+interface RemoteConnection {
+  id: string;
+  from_node_id: string;
+  to_node_id: string;
+  relationship: string | null;
+  version: number;
 }
 
 /**
@@ -45,10 +55,6 @@ interface RemoteMindmap {
 class SyncService {
   /**
    * Main sync: push local, then pull remote.
-   * Token is fetched from store by fetchWithAuth on each request.
-   *
-   * Note: Callers (SyncController, SyncStatusIndicator) are responsible for
-   * managing the isSyncing state to prevent concurrent calls.
    */
   async sync(): Promise<SyncResult> {
     let synced = 0;
@@ -72,6 +78,11 @@ class SyncService {
     }
   }
 
+  async getPendingChangesCount(): Promise<number> {
+    return changeQueries.getCount();
+  }
+
+  // PUSH: Local → Backend
   private async pushChanges(): Promise<SyncResult> {
     const changes = await changeQueries.getPending();
     let synced = 0;
@@ -84,11 +95,20 @@ class SyncService {
     const nodeChanges = grouped["mindmap_nodes"] || [];
     const connectionChanges = grouped["connections"] || [];
 
+    // Batch fetch mindmaps to sync
     const mindmapIdsToSync = mindmapChanges
       .filter((c) => c.operation !== "DELETE")
       .map((c) => c.record_id);
     const mindmapsToSync = await mindmapQueries.getByIds(mindmapIdsToSync);
     const mindmapMap = new Map(mindmapsToSync.map((m) => [m.mindMap.id, m]));
+
+    // Build lookup maps for O(1) node/connection → mindmap resolution
+    const nodeToMindmap = new Map<string, string>();
+    const connToMindmap = new Map<string, string>();
+    for (const m of mindmapsToSync) {
+      for (const n of m.nodes) nodeToMindmap.set(n.id, m.mindMap.id);
+      for (const c of m.connections) connToMindmap.set(c.id, m.mindMap.id);
+    }
 
     for (const change of mindmapChanges) {
       try {
@@ -101,43 +121,35 @@ class SyncService {
           }
         }
         synced++;
-        // Mark mindmap change as synced
         syncedChanges.push(change);
-        // Also mark all node/connection changes for this mindmap as synced
+
+        // Mark all related node/connection changes as synced
         const mindmapId = change.record_id;
         syncedChanges.push(
           ...nodeChanges.filter(
-            (c) =>
-              c.record_id.startsWith(mindmapId) ||
-              this.getNodeMindmapId(c, mindmapsToSync) === mindmapId
+            (c) => nodeToMindmap.get(c.record_id) === mindmapId
           ),
           ...connectionChanges.filter(
-            (c) => this.getConnectionMindmapId(c, mindmapsToSync) === mindmapId
+            (c) => connToMindmap.get(c.record_id) === mindmapId
           )
         );
       } catch (error) {
         const err = error as { status?: number };
-        if (err.status === 409) {
-          // Conflict detected during push - will be resolved during pull
-        } else {
+        if (err.status !== 409) {
           failed++;
           console.error(
             `[Sync] Push failed for mindmaps:${change.record_id}`,
             error
           );
         }
+        // 409 = conflict, will be resolved during pull
       }
     }
 
-    // Mark node-only changes (no parent mindmap change) - they're included in mindmap sync
-    for (const nodeChange of nodeChanges) {
-      if (!syncedChanges.includes(nodeChange)) {
-        syncedChanges.push(nodeChange);
-      }
-    }
-    for (const connChange of connectionChanges) {
-      if (!syncedChanges.includes(connChange)) {
-        syncedChanges.push(connChange);
+    // Mark remaining node/connection changes as synced (they're included in mindmap sync)
+    for (const change of [...nodeChanges, ...connectionChanges]) {
+      if (!syncedChanges.includes(change)) {
+        syncedChanges.push(change);
       }
     }
 
@@ -148,82 +160,49 @@ class SyncService {
     return { success: true, synced, failed, conflicts: conflictItems };
   }
 
-  private getNodeMindmapId(
-    change: ChangeRow,
-    mindmaps: FullMindMap[]
-  ): string | null {
-    for (const m of mindmaps) {
-      if (m.nodes.some((n) => n.id === change.record_id)) {
-        return m.mindMap.id;
-      }
-    }
-    return null;
-  }
-
-  private getConnectionMindmapId(
-    change: ChangeRow,
-    mindmaps: FullMindMap[]
-  ): string | null {
-    for (const m of mindmaps) {
-      if (m.connections.some((c) => c.id === change.record_id)) {
-        return m.mindMap.id;
-      }
-    }
-    return null;
-  }
-
+  /**
+   * Push mindmap to backend via PUT (backend handles create-if-not-exists)
+   */
   private async upsertOnBackend(fullMindmap: FullMindMap): Promise<void> {
-    const id = fullMindmap.mindMap.id;
     const payload = {
       id: fullMindmap.mindMap.id,
       title: fullMindmap.mindMap.title,
-      central_topic: fullMindmap.mindMap.central_topic ?? "",
-      summary: fullMindmap.mindMap.summary ?? "",
+      central_topic: fullMindmap.mindMap.central_topic ?? null,
+      summary: fullMindmap.mindMap.summary ?? null,
       document_id: fullMindmap.mindMap.document_id ?? null,
       version: fullMindmap.mindMap.version,
       nodes: fullMindmap.nodes.map((n) => ({
         id: n.id,
         label: n.label,
-        keywords: n.keywords ? (JSON.parse(n.keywords) as string[]) : [],
+        keywords: n.keywords,
         level: n.level,
         parent_id: n.parent_id ?? null,
-        position: { x: n.position_x, y: n.position_y },
+        position_x: n.position_x,
+        position_y: n.position_y,
         notes: n.notes ?? null,
+        version: n.version,
       })),
       connections: fullMindmap.connections.map((c) => ({
         id: c.id,
-        from: c.from_node_id,
-        to: c.to_node_id,
+        from_node_id: c.from_node_id,
+        to_node_id: c.to_node_id,
         relationship: c.relationship ?? null,
+        version: c.version,
       })),
     };
 
-    // Try PUT (update) first, fallback to POST (create) if mindmap doesn't exist
-    const updateResult = await fetchWithAuth(`/api/mindmaps/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    });
-
-    // If mindmap doesn't exist on server, create it via POST
-    if (updateResult.status === 404) {
-      const createResult = await fetchWithAuth(`/api/mindmaps`, {
-        method: "POST",
+    // PUT only - backend updateMindmap handles create-if-not-exists
+    const result = await fetchWithAuth(
+      `/api/mindmaps/${fullMindmap.mindMap.id}`,
+      {
+        method: "PUT",
         body: JSON.stringify(payload),
-      });
-
-      if (createResult.error) {
-        const error = new Error(createResult.error) as Error & {
-          status: number;
-        };
-        error.status = createResult.status;
-        throw error;
       }
-      return;
-    }
+    );
 
-    if (updateResult.error) {
-      const error = new Error(updateResult.error) as Error & { status: number };
-      error.status = updateResult.status;
+    if (result.error) {
+      const error = new Error(result.error) as Error & { status: number };
+      error.status = result.status;
       throw error;
     }
   }
@@ -232,26 +211,23 @@ class SyncService {
     const result = await fetchWithAuth(`/api/mindmaps/${id}`, {
       method: "DELETE",
     });
-
     if (result.error && result.status !== 404) {
       throw new Error(result.error);
     }
   }
 
+  // PULL: Backend → Local
   private async pullChanges(): Promise<SyncResult> {
     let synced = 0;
     const conflictItems: ConflictItem[] = [];
 
     try {
       const lastSync = await changeQueries.getLastSyncTimestamp();
-
       const result = await fetchWithAuth<RemoteMindmap[]>(
         `/api/mindmaps?since=${lastSync}`
       );
 
-      if (result.error) {
-        throw new Error(result.error);
-      }
+      if (result.error) throw new Error(result.error);
 
       const remoteMindmaps = result.data || [];
       const remoteIds = remoteMindmaps.map((r) => r.id);
@@ -275,7 +251,7 @@ class SyncService {
             localTitle: local.title,
             remoteTitle: remote.title,
             localUpdatedAt: local.updated_at,
-            remoteUpdatedAt: remote.updated_at ?? 0,
+            remoteUpdatedAt: remote.updated_at,
           });
         }
       }
@@ -310,41 +286,13 @@ class SyncService {
         ]
       );
 
-      for (const node of remote.nodes ?? []) {
-        await db.runAsync(
-          `INSERT INTO mindmap_nodes (id, mindmap_id, label, keywords, level, parent_id, 
-            position_x, position_y, notes, is_synced, last_synced_at, version)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 1)`,
-          [
-            node.id,
-            remote.id,
-            node.label,
-            JSON.stringify(node.keywords ?? []),
-            node.level ?? 0,
-            node.parent_id ?? null,
-            node.position?.x ?? 0,
-            node.position?.y ?? 0,
-            node.notes ?? null,
-            now,
-          ]
-        );
-      }
-
-      for (const conn of remote.connections ?? []) {
-        await db.runAsync(
-          `INSERT INTO connections (id, mindmap_id, from_node_id, to_node_id, relationship, 
-            is_synced, last_synced_at, version)
-           VALUES (?, ?, ?, ?, ?, 1, ?, 1)`,
-          [
-            conn.id,
-            remote.id,
-            conn.from,
-            conn.to,
-            conn.relationship ?? null,
-            now,
-          ]
-        );
-      }
+      await this.insertNodesFromRemote(db, remote.id, remote.nodes ?? [], now);
+      await this.insertConnectionsFromRemote(
+        db,
+        remote.id,
+        remote.connections ?? [],
+        now
+      );
     });
   }
 
@@ -368,6 +316,7 @@ class SyncService {
         ]
       );
 
+      // Preserve unsynced local changes
       const unsyncedNodes = await db.getAllAsync<{ id: string }>(
         `SELECT id FROM mindmap_nodes WHERE mindmap_id = ? AND is_synced = 0`,
         [remote.id]
@@ -379,6 +328,7 @@ class SyncService {
       const preserveNodeIds = new Set(unsyncedNodes.map((n) => n.id));
       const preserveConnIds = new Set(unsyncedConns.map((c) => c.id));
 
+      // Delete synced items, then insert remote data
       await db.runAsync(
         `DELETE FROM mindmap_nodes WHERE mindmap_id = ? AND is_synced = 1`,
         [remote.id]
@@ -388,46 +338,87 @@ class SyncService {
         [remote.id]
       );
 
-      for (const node of remote.nodes ?? []) {
-        if (preserveNodeIds.has(node.id)) continue;
-        await db.runAsync(
-          `INSERT OR REPLACE INTO mindmap_nodes 
-           (id, mindmap_id, label, keywords, level, parent_id, 
-            position_x, position_y, notes, is_synced, last_synced_at, version)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 1)`,
-          [
-            node.id,
-            remote.id,
-            node.label,
-            JSON.stringify(node.keywords ?? []),
-            node.level ?? 0,
-            node.parent_id ?? null,
-            node.position?.x ?? 0,
-            node.position?.y ?? 0,
-            node.notes ?? null,
-            now,
-          ]
-        );
-      }
-
-      for (const conn of remote.connections ?? []) {
-        if (preserveConnIds.has(conn.id)) continue;
-        await db.runAsync(
-          `INSERT OR REPLACE INTO connections 
-           (id, mindmap_id, from_node_id, to_node_id, relationship, 
-            is_synced, last_synced_at, version)
-           VALUES (?, ?, ?, ?, ?, 1, ?, 1)`,
-          [
-            conn.id,
-            remote.id,
-            conn.from,
-            conn.to,
-            conn.relationship ?? null,
-            now,
-          ]
-        );
-      }
+      await this.insertNodesFromRemote(
+        db,
+        remote.id,
+        remote.nodes ?? [],
+        now,
+        preserveNodeIds
+      );
+      await this.insertConnectionsFromRemote(
+        db,
+        remote.id,
+        remote.connections ?? [],
+        now,
+        preserveConnIds
+      );
     });
+  }
+
+  // HELPER FUNCTIONS (DRY)
+
+  /**
+   * Insert nodes from remote data, optionally preserving specific IDs
+   */
+  private async insertNodesFromRemote(
+    db: SQLiteDatabase,
+    mindmapId: string,
+    nodes: RemoteNode[],
+    now: number,
+    preserveIds?: Set<string>
+  ): Promise<void> {
+    for (const node of nodes) {
+      if (preserveIds?.has(node.id)) continue;
+      await db.runAsync(
+        `INSERT OR REPLACE INTO mindmap_nodes 
+         (id, mindmap_id, label, keywords, level, parent_id, 
+          position_x, position_y, notes, is_synced, last_synced_at, version)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+        [
+          node.id,
+          mindmapId,
+          node.label,
+          node.keywords ?? null,
+          node.level,
+          node.parent_id ?? null,
+          node.position_x,
+          node.position_y,
+          node.notes ?? null,
+          now,
+          node.version ?? 1,
+        ]
+      );
+    }
+  }
+
+  /**
+   * Insert connections from remote data, optionally preserving specific IDs
+   */
+  private async insertConnectionsFromRemote(
+    db: SQLiteDatabase,
+    mindmapId: string,
+    connections: RemoteConnection[],
+    now: number,
+    preserveIds?: Set<string>
+  ): Promise<void> {
+    for (const conn of connections) {
+      if (preserveIds?.has(conn.id)) continue;
+      await db.runAsync(
+        `INSERT OR REPLACE INTO connections 
+         (id, mindmap_id, from_node_id, to_node_id, relationship, 
+          is_synced, last_synced_at, version)
+         VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+        [
+          conn.id,
+          mindmapId,
+          conn.from_node_id,
+          conn.to_node_id,
+          conn.relationship ?? null,
+          now,
+          conn.version ?? 1,
+        ]
+      );
+    }
   }
 
   private groupByTable(changes: ChangeRow[]): Record<string, ChangeRow[]> {
@@ -438,10 +429,6 @@ class SyncService {
       },
       {} as Record<string, ChangeRow[]>
     );
-  }
-
-  async getPendingChangesCount(): Promise<number> {
-    return changeQueries.getCount();
   }
 }
 
