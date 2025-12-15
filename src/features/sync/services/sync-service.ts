@@ -77,9 +77,12 @@ class SyncService {
     let synced = 0;
     let failed = 0;
     const conflictItems: ConflictItem[] = [];
+    const syncedChanges: ChangeRow[] = [];
 
     const grouped = this.groupByTable(changes);
     const mindmapChanges = grouped["mindmaps"] || [];
+    const nodeChanges = grouped["mindmap_nodes"] || [];
+    const connectionChanges = grouped["connections"] || [];
 
     const mindmapIdsToSync = mindmapChanges
       .filter((c) => c.operation !== "DELETE")
@@ -98,6 +101,20 @@ class SyncService {
           }
         }
         synced++;
+        // Mark mindmap change as synced
+        syncedChanges.push(change);
+        // Also mark all node/connection changes for this mindmap as synced
+        const mindmapId = change.record_id;
+        syncedChanges.push(
+          ...nodeChanges.filter(
+            (c) =>
+              c.record_id.startsWith(mindmapId) ||
+              this.getNodeMindmapId(c, mindmapsToSync) === mindmapId
+          ),
+          ...connectionChanges.filter(
+            (c) => this.getConnectionMindmapId(c, mindmapsToSync) === mindmapId
+          )
+        );
       } catch (error) {
         const err = error as { status?: number };
         if (err.status === 409) {
@@ -112,11 +129,47 @@ class SyncService {
       }
     }
 
-    if (synced > 0) {
-      await changeQueries.markAsSynced(mindmapChanges.slice(0, synced));
+    // Mark node-only changes (no parent mindmap change) - they're included in mindmap sync
+    for (const nodeChange of nodeChanges) {
+      if (!syncedChanges.includes(nodeChange)) {
+        syncedChanges.push(nodeChange);
+      }
+    }
+    for (const connChange of connectionChanges) {
+      if (!syncedChanges.includes(connChange)) {
+        syncedChanges.push(connChange);
+      }
+    }
+
+    if (syncedChanges.length > 0) {
+      await changeQueries.markAsSynced(syncedChanges);
     }
 
     return { success: true, synced, failed, conflicts: conflictItems };
+  }
+
+  private getNodeMindmapId(
+    change: ChangeRow,
+    mindmaps: FullMindMap[]
+  ): string | null {
+    for (const m of mindmaps) {
+      if (m.nodes.some((n) => n.id === change.record_id)) {
+        return m.mindMap.id;
+      }
+    }
+    return null;
+  }
+
+  private getConnectionMindmapId(
+    change: ChangeRow,
+    mindmaps: FullMindMap[]
+  ): string | null {
+    for (const m of mindmaps) {
+      if (m.connections.some((c) => c.id === change.record_id)) {
+        return m.mindMap.id;
+      }
+    }
+    return null;
   }
 
   private async upsertOnBackend(fullMindmap: FullMindMap): Promise<void> {
@@ -145,14 +198,32 @@ class SyncService {
       })),
     };
 
-    const result = await fetchWithAuth(`/api/mindmaps/${id}`, {
+    // Try PUT (update) first, fallback to POST (create) if mindmap doesn't exist
+    const updateResult = await fetchWithAuth(`/api/mindmaps/${id}`, {
       method: "PUT",
       body: JSON.stringify(payload),
     });
 
-    if (result.error) {
-      const error = new Error(result.error) as Error & { status: number };
-      error.status = result.status;
+    // If mindmap doesn't exist on server, create it via POST
+    if (updateResult.status === 404) {
+      const createResult = await fetchWithAuth(`/api/mindmaps`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      if (createResult.error) {
+        const error = new Error(createResult.error) as Error & {
+          status: number;
+        };
+        error.status = createResult.status;
+        throw error;
+      }
+      return;
+    }
+
+    if (updateResult.error) {
+      const error = new Error(updateResult.error) as Error & { status: number };
+      error.status = updateResult.status;
       throw error;
     }
   }
