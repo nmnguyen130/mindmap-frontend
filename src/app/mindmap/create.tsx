@@ -1,13 +1,24 @@
 import * as Crypto from "expo-crypto";
 import * as DocumentPicker from "expo-document-picker";
 import { router } from "expo-router";
-import { useState } from "react";
-import { Alert, Pressable, Text, TextInput, View } from "react-native";
+import { useState, useCallback } from "react";
+import {
+  Alert,
+  Pressable,
+  Text,
+  View,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+} from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 
 import Header from "@/components/layout/header";
 import SourceDocumentSection from "@/components/mindmap/create/source-document-section";
 import { useTheme } from "@/components/providers/theme-provider";
-import FormScreen from "@/components/ui/form-screen";
+import ThemedTextInput from "@/components/ui/text-input";
 import { useCreateFromPdf } from "@/features/document/hooks/use-pdf-upload";
 import { useMindmaps } from "@/features/mindmap";
 
@@ -18,29 +29,31 @@ interface SelectedFile {
   size?: number | null;
 }
 
-interface MindMapAISourceContext {
-  type: "none" | "file" | "url" | "file_and_url";
-  file?: SelectedFile;
-  url?: string;
-}
-
 const CreateMindMapScreen = () => {
   const [title, setTitle] = useState("");
-  const [documentUrl, setDocumentUrl] = useState("");
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
   const { create, isLoading } = useMindmaps();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const createFromPdf = useCreateFromPdf();
 
-  const handleBackPress = () => {
-    router.back();
-  };
+  // Gradients
+  const heroGradient: [string, string] = isDark
+    ? ["#1e3a8a", "#312e81"]
+    : ["#3b82f6", "#8b5cf6"];
 
-  const handlePickFile = async () => {
+  const buttonGradient: [string, string] = isDark
+    ? ["#059669", "#047857"]
+    : ["#10b981", "#059669"];
+
+  const handleBackPress = useCallback(() => {
+    router.back();
+  }, []);
+
+  const handlePickFile = useCallback(async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: "*/*",
-        copyToCacheDirectory: false,
+        type: "application/pdf",
+        copyToCacheDirectory: true,
       });
 
       if (result.canceled || !result.assets || result.assets.length === 0) {
@@ -48,7 +61,6 @@ const CreateMindMapScreen = () => {
       }
 
       const asset = result.assets[0];
-
       setSelectedFile({
         name: asset.name ?? "Untitled document",
         uri: asset.uri,
@@ -57,19 +69,25 @@ const CreateMindMapScreen = () => {
       });
     } catch (error) {
       console.error("Document pick failed:", error);
+      Alert.alert("Error", "Failed to select document.");
     }
-  };
+  }, []);
 
-  const handleCreate = async () => {
+  const handleClearFile = useCallback(() => {
+    setSelectedFile(null);
+  }, []);
+
+  const handleCreate = useCallback(async () => {
     const trimmedTitle = title.trim();
 
     if (!trimmedTitle) {
+      Alert.alert("Missing Title", "Please enter a title for your mindmap.");
       return;
     }
 
     try {
       if (selectedFile) {
-        // Flow A: With PDF - Upload to backend for AI processing
+        // With PDF - AI processing
         const result = await createFromPdf.mutateAsync({
           file: {
             uri: selectedFile.uri,
@@ -80,25 +98,23 @@ const CreateMindMapScreen = () => {
           generateMindmap: true,
         });
 
-        // Store mindmap from backend response
         if (result.mindmap) {
-          // Ensure edges have IDs (backend might not include them)
           const transformedEdges = result.mindmap.mindmap_data.edges.map(
-            (edge: any) => ({
-              ...edge,
-              id: edge.id || `edge-${Date.now()}-${Math.random()}`,
+            (edge) => ({
+              id: edge.id,
+              from: edge.from,
+              to: edge.to,
+              relationship: edge.relationship,
             })
           );
-          // Transform nodes to expected format (backend may use different structure)
           const transformedNodes = result.mindmap.mindmap_data.nodes.map(
-            (node: any) => ({
+            (node) => ({
               id: node.id,
               label: node.label,
               keywords: node.keywords,
-              level: node.level ?? 0,
-              parent_id: node.parent_id,
-              position: node.position ?? { x: node.x ?? 0, y: node.y ?? 0 },
-              notes: node.notes,
+              level: node.level,
+              parent_id: node.parent_id ?? undefined,
+              position: { x: 0, y: 0 },
             })
           );
 
@@ -112,32 +128,18 @@ const CreateMindMapScreen = () => {
           });
           router.push(`/mindmap/${result.mindmap.id}`);
         } else {
-          Alert.alert(
-            "Error",
-            "Backend did not generate a mindmap. Please try again."
-          );
+          Alert.alert("Error", "Failed to generate mindmap. Try again.");
         }
       } else {
-        // Flow B: Without PDF - Create blank mindmap locally
+        // Blank mindmap - completely empty, no nodes
         const newId = Crypto.randomUUID();
-        const rootNodeId = Crypto.randomUUID();
 
         await create.mutateAsync({
           id: newId,
           title: trimmedTitle,
           central_topic: trimmedTitle,
           summary: "",
-          nodes: [
-            {
-              id: rootNodeId,
-              label: trimmedTitle,
-              level: 0,
-              parent_id: undefined,
-              keywords: [],
-              position: { x: 0, y: 0 },
-              notes: undefined,
-            },
-          ],
+          nodes: [],
           edges: [],
         });
 
@@ -149,92 +151,172 @@ const CreateMindMapScreen = () => {
       console.error("Mindmap creation failed:", error);
       Alert.alert("Creation Failed", message);
     }
-  };
+  }, [title, selectedFile, create, createFromPdf]);
 
-  const canSubmit =
-    title.trim().length > 0 && !isLoading && !createFromPdf.isPending;
+  const isProcessing = isLoading || createFromPdf.isPending;
+  const canSubmit = title.trim().length > 0 && !isProcessing;
+
+  const getButtonText = () => {
+    if (createFromPdf.isPending) return "Processing...";
+    if (isLoading) return "Creating...";
+    if (selectedFile) return "Create with AI";
+    return "Create Mindmap";
+  };
 
   return (
     <View className="flex-1" style={{ backgroundColor: colors.background }}>
       <Header
-        title="Create Mind Map"
+        title="New Mindmap"
         onMenuPress={() => {}}
         showBackButton
         onBackPress={handleBackPress}
       />
-      <FormScreen>
-        <View className="mb-6">
-          <Text
-            className="text-xs font-semibold uppercase mb-2"
-            style={{ color: colors.mutedForeground }}
-          >
-            Basic info
-          </Text>
-          <Text
-            className="text-2xl font-bold mb-2"
-            style={{ color: colors.foreground }}
-          >
-            Create a new mind map
-          </Text>
-          <Text className="text-sm" style={{ color: colors.mutedForeground }}>
-            Give your mind map a clear title. Optionally attach a PDF document
-            to generate AI-powered content.
-          </Text>
-        </View>
 
-        <View className="mb-6">
-          <Text
-            className="text-sm font-semibold mb-2"
-            style={{ color: colors.foreground }}
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          className="flex-1"
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Hero Section */}
+          <LinearGradient
+            colors={heroGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            className="px-5 pt-5 pb-6"
           >
-            Title
-          </Text>
-          <TextInput
-            className="w-full rounded-xl px-4 py-3 border"
-            placeholder="Mind map title"
-            placeholderTextColor={colors.mutedForeground}
-            value={title}
-            onChangeText={setTitle}
-            style={{
-              borderColor: colors.border,
-              backgroundColor: colors.surface,
-              color: colors.foreground,
-            }}
-          />
-        </View>
+            <View className="flex-row items-center mb-2">
+              <View
+                className="w-10 h-10 rounded-full items-center justify-center mr-3"
+                style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
+              >
+                <MaterialIcons name="add-circle" size={22} color="#ffffff" />
+              </View>
+              <Text className="text-2xl font-bold" style={{ color: "#ffffff" }}>
+                Create Mindmap
+              </Text>
+            </View>
+            <Text
+              className="text-sm"
+              style={{ color: "rgba(255,255,255,0.9)" }}
+            >
+              Start blank or upload a PDF for AI generation
+            </Text>
+          </LinearGradient>
 
-        <SourceDocumentSection
-          documentUrl={documentUrl}
-          selectedFileName={selectedFile ? selectedFile.name : null}
-          onChangeUrl={setDocumentUrl}
-          onPickFile={() => void handlePickFile()}
-        />
+          {/* Form Content */}
+          <View className="px-5 py-5">
+            <ThemedTextInput
+              label="Title"
+              placeholder="Enter mindmap title..."
+              value={title}
+              onChangeText={setTitle}
+              leftIcon="title"
+              autoFocus
+              returnKeyType="done"
+            />
 
-        <View className="mt-auto">
+            <SourceDocumentSection
+              selectedFileName={selectedFile?.name ?? null}
+              onPickFile={handlePickFile}
+              onClearFile={handleClearFile}
+            />
+
+            {/* Mode Indicator */}
+            <View
+              className="flex-row items-center p-4 rounded-2xl"
+              style={{
+                backgroundColor: colors.surface,
+                borderWidth: 1,
+                borderColor: colors.border,
+              }}
+            >
+              <View
+                className="w-10 h-10 rounded-xl items-center justify-center mr-3"
+                style={{
+                  backgroundColor: selectedFile
+                    ? colors.success + "20"
+                    : colors.primary + "20",
+                }}
+              >
+                <MaterialIcons
+                  name={selectedFile ? "auto-awesome" : "edit"}
+                  size={20}
+                  color={selectedFile ? colors.success : colors.primary}
+                />
+              </View>
+              <View className="flex-1">
+                <Text
+                  className="text-sm font-semibold"
+                  style={{ color: colors.foreground }}
+                >
+                  {selectedFile ? "AI-Powered" : "Manual Creation"}
+                </Text>
+                <Text
+                  className="text-xs"
+                  style={{ color: colors.mutedForeground }}
+                >
+                  {selectedFile
+                    ? "AI will generate nodes from PDF"
+                    : "Start with a blank canvas"}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+
+        {/* Bottom Action Button */}
+        <View
+          className="px-5 pb-6 pt-4"
+          style={{
+            backgroundColor: colors.background,
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+          }}
+        >
           <Pressable
-            className="w-full rounded-xl px-4 py-3 items-center justify-center"
-            onPress={() => void handleCreate()}
+            onPress={handleCreate}
             disabled={!canSubmit}
             style={{
-              backgroundColor: canSubmit
-                ? colors.primary
-                : colors.mutedForeground,
-              opacity: isLoading ? 0.8 : 1,
+              opacity: canSubmit ? 1 : 0.5,
+              borderRadius: 16,
+              overflow: "hidden",
             }}
           >
-            <Text
-              className="text-base font-semibold"
-              style={{ color: colors.primaryForeground }}
+            <LinearGradient
+              colors={canSubmit ? buttonGradient : [colors.muted, colors.muted]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                paddingVertical: 16,
+                borderRadius: 16,
+              }}
             >
-              {createFromPdf.isPending
-                ? "Uploading..."
-                : isLoading
-                  ? "Creating..."
-                  : "Create mind map"}
-            </Text>
+              {isProcessing ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <MaterialIcons
+                  name={selectedFile ? "auto-awesome" : "add"}
+                  size={22}
+                  color="#ffffff"
+                />
+              )}
+              <Text
+                className="text-base font-bold ml-2"
+                style={{ color: "#ffffff" }}
+              >
+                {getButtonText()}
+              </Text>
+            </LinearGradient>
           </Pressable>
         </View>
-      </FormScreen>
+      </KeyboardAvoidingView>
     </View>
   );
 };

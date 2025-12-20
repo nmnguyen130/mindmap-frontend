@@ -31,7 +31,7 @@ interface RemoteMindmap {
 interface RemoteNode {
   id: string;
   label: string;
-  keywords: string | null;
+  keywords: string[] | null; // JSONB from backend
   level: number;
   parent_id: string | null;
   position_x: number;
@@ -174,7 +174,7 @@ class SyncService {
       nodes: fullMindmap.nodes.map((n) => ({
         id: n.id,
         label: n.label,
-        keywords: n.keywords,
+        keywords: n.keywords ? JSON.parse(n.keywords) : null, // Parse SQLite TEXT -> array for JSONB
         level: n.level,
         parent_id: n.parent_id ?? null,
         position_x: n.position_x,
@@ -378,7 +378,7 @@ class SyncService {
           node.id,
           mindmapId,
           node.label,
-          node.keywords ?? null,
+          node.keywords ? JSON.stringify(node.keywords) : null, // Stringify array -> TEXT for SQLite
           node.level,
           node.parent_id ?? null,
           node.position_x,
