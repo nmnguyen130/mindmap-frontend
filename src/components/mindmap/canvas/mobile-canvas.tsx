@@ -1,11 +1,13 @@
-import { Canvas, Group, Skia } from "@shopify/react-native-skia";
+import { Canvas, Group } from "@shopify/react-native-skia";
 import React, { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
+import { useSharedValue } from "react-native-reanimated";
 
 import { useTheme } from "@/components/providers/theme-provider";
 import type { MindMapNode, MindmapData } from "@/features/mindmap";
 import { getNodeBox } from "@/features/mindmap/utils/node-utils";
 
+import NodeFloatBox from "../ui/node-float-box";
 import NodeSelectionPanel from "../ui/node-selection-panel";
 
 import Connection from "./connection";
@@ -13,88 +15,91 @@ import GestureHandler from "./gesture-handler";
 import Node from "./node";
 import ViewportCulling from "./viewport-culling";
 
+// Types
+
 interface MobileCanvasProps {
   nodes: MindMapNode[];
   edges: MindmapData["edges"];
   mindmapId: string;
   documentId?: string;
+  onNodeMove?: (nodeId: string, x: number, y: number) => void;
 }
+
+// Component
 
 const MobileCanvas = ({
   nodes,
   edges,
   mindmapId,
   documentId,
+  onNodeMove,
 }: MobileCanvasProps) => {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
+  // UI State
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-
-  // Canvas dimensions
+  const [showChatPanel, setShowChatPanel] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 
-  const paints = useMemo(() => {
-    const createPaint = (color: string, style = 0, strokeWidth = 1) => {
-      const paint = Skia.Paint();
-      paint.setColor(Skia.Color(color));
-      paint.setStyle(style); // 0 = fill, 1 = stroke
-      paint.setStrokeWidth(strokeWidth);
-      paint.setAntiAlias(true);
-      return paint;
-    };
+  // Drag state
+  const [dragPosition, setDragPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const isDraggingNode = useSharedValue(false);
 
-    return {
-      nodeFill: createPaint(isDark ? "#1e293b" : "#dbeafe"),
-      nodeStroke: createPaint(colors.connection, 1, 2),
-      selectedNodeStroke: createPaint(colors.primary, 1, 3),
-      connection: createPaint(colors.connection, 1, 2),
-      text: createPaint(isDark ? "#f1f5f9" : "#1e40af"),
-    };
-  }, [colors, isDark]);
-
-  // Quick node lookup map
+  // Node map
   const nodeMap = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
+  const selectedNode = selectedNodeId
+    ? (nodeMap.get(selectedNodeId) ?? null)
+    : null;
 
-  const selectedNode = useMemo(() => {
-    if (!selectedNodeId) return null;
-    return nodeMap.get(selectedNodeId) ?? null;
-  }, [selectedNodeId, nodeMap]);
-
+  // Related nodes
   const relatedNodes = useMemo(() => {
     if (!selectedNode) return [];
-
-    const neighbors: MindMapNode[] = [];
-
-    // Find neighbors through edges
-    edges.forEach((edge) => {
-      if (edge.from === selectedNode.id) {
-        const target = nodeMap.get(edge.to);
-        if (target) neighbors.push(target);
-      } else if (edge.to === selectedNode.id) {
-        const source = nodeMap.get(edge.from);
-        if (source) neighbors.push(source);
-      }
-    });
-
-    // Deduplicate by id
-    const seen = new Set<string>();
-    return neighbors.filter((node) => {
-      if (seen.has(node.id)) return false;
-      seen.add(node.id);
-      return true;
-    });
+    const ids = new Set<string>();
+    for (const edge of edges) {
+      if (edge.from === selectedNode.id) ids.add(edge.to);
+      else if (edge.to === selectedNode.id) ids.add(edge.from);
+    }
+    return Array.from(ids)
+      .map((id) => nodeMap.get(id))
+      .filter((n): n is MindMapNode => !!n);
   }, [selectedNode, nodeMap, edges]);
 
-  // Find node at touch position
+  // Colors
+  const nodeColors = useMemo(
+    () => ({
+      fill: colors.nodeBackground,
+      stroke: colors.nodeBorder,
+      text: colors.nodeForeground,
+    }),
+    [colors.nodeBackground, colors.nodeBorder, colors.nodeForeground]
+  );
+  const selectedColors = useMemo(
+    () => ({
+      fill: colors.nodeBackground,
+      stroke: colors.primary,
+      text: colors.nodeForeground,
+    }),
+    [colors.nodeBackground, colors.primary, colors.nodeForeground]
+  );
+  const connectionColor = useMemo(
+    () => ({ stroke: colors.connection }),
+    [colors.connection]
+  );
+
+  // Find node at point
   const findNodeAtPoint = useCallback(
-    (point: { x: number; y: number }): MindMapNode | null => {
-      for (const node of nodes) {
+    (x: number, y: number) => {
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        const node = nodes[i];
         const box = getNodeBox(node);
         if (
-          point.x >= box.left &&
-          point.x <= box.right &&
-          point.y >= box.top &&
-          point.y <= box.bottom
+          x >= box.left &&
+          x <= box.right &&
+          y >= box.top &&
+          y <= box.bottom
         ) {
           return node;
         }
@@ -104,129 +109,170 @@ const MobileCanvas = ({
     [nodes]
   );
 
-  // Handle node tap
-  const handleNodeTap = useCallback(
-    (worldX: number, worldY: number) => {
-      const node = findNodeAtPoint({ x: worldX, y: worldY });
-      const newSelected = node?.id ?? null;
-      if (newSelected !== selectedNodeId) {
-        setSelectedNodeId(newSelected);
+  // Tap: select node or deselect
+  const handleTap = useCallback(
+    (x: number, y: number) => {
+      const node = findNodeAtPoint(x, y);
+      if (node) {
+        setSelectedNodeId(node.id);
+        setShowChatPanel(false);
+        isDraggingNode.value = true; // Enable dragging for selected node
+      } else {
+        setSelectedNodeId(null);
+        isDraggingNode.value = false;
       }
     },
-    [findNodeAtPoint, selectedNodeId]
+    [findNodeAtPoint, isDraggingNode]
   );
 
-  // Clear selection
-  const deselectNode = useCallback(() => {
-    if (selectedNodeId) {
-      setSelectedNodeId(null);
+  // Drag: move selected node
+  const handleDrag = useCallback(
+    (x: number, y: number) => {
+      if (selectedNodeId) {
+        setDragPosition({ x, y });
+      }
+    },
+    [selectedNodeId]
+  );
+
+  // Drag end: persist position
+  const handleDragEnd = useCallback(() => {
+    if (selectedNodeId && dragPosition && onNodeMove) {
+      onNodeMove(selectedNodeId, dragPosition.x, dragPosition.y);
     }
-  }, [selectedNodeId]);
+    setDragPosition(null);
+  }, [selectedNodeId, dragPosition, onNodeMove]);
 
-  // Render connections - show all links where at least one node is visible
-  const renderConnections = React.useCallback(
+  // Open chat panel
+  const handleOpenChat = useCallback(() => {
+    setShowChatPanel(true);
+  }, []);
+
+  // Close selection
+  const handleClose = useCallback(() => {
+    setSelectedNodeId(null);
+    setShowChatPanel(false);
+    isDraggingNode.value = false;
+  }, [isDraggingNode]);
+
+  // Get display position
+  const getDisplayPosition = useCallback(
+    (node: MindMapNode) => {
+      if (node.id === selectedNodeId && dragPosition) {
+        return dragPosition;
+      }
+      return node.position ?? { x: 0, y: 0 };
+    },
+    [selectedNodeId, dragPosition]
+  );
+
+  // Render content
+  const renderContent = useCallback(
     (visibleNodes: MindMapNode[]) => {
-      if (visibleNodes.length === 0) return null;
+      const visibleIds = new Set(visibleNodes.map((n) => n.id));
 
-      const visibleNodeIds = new Set(visibleNodes.map((node) => node.id));
-      const connectionComponents: React.ReactNode[] = [];
-
-      edges.forEach((edge) => {
-        const sourceNode = nodeMap.get(edge.from);
-        const targetNode = nodeMap.get(edge.to);
-
-        if (!sourceNode || !targetNode) return;
-
-        // Draw connection if either end is on screen
-        if (
-          visibleNodeIds.has(sourceNode.id) ||
-          visibleNodeIds.has(targetNode.id)
-        ) {
-          connectionComponents.push(
+      const connections = edges
+        .filter(
+          (e) =>
+            nodeMap.has(e.from) &&
+            nodeMap.has(e.to) &&
+            (visibleIds.has(e.from) || visibleIds.has(e.to))
+        )
+        .map((e) => {
+          const fromNode = nodeMap.get(e.from)!;
+          const toNode = nodeMap.get(e.to)!;
+          return (
             <Connection
-              key={`${edge.from}-${edge.to}`}
-              fromNode={sourceNode}
-              toNode={targetNode}
-              connectionPaint={paints.connection}
+              key={`${e.from}-${e.to}`}
+              fromNode={{ ...fromNode, position: getDisplayPosition(fromNode) }}
+              toNode={{ ...toNode, position: getDisplayPosition(toNode) }}
+              colors={connectionColor}
             />
           );
-        }
-      });
+        });
 
-      return connectionComponents;
-    },
-    [nodes, nodeMap, paints.connection, edges]
-  );
-
-  // Render visible nodes
-  const renderNodes = React.useCallback(
-    (visibleNodes: MindMapNode[]) => {
-      if (visibleNodes.length === 0) return null;
-
-      return visibleNodes.map((node) => {
-        const isSelected = selectedNodeId === node.id;
+      const nodeElements = visibleNodes.map((node) => {
+        const isSelected = node.id === selectedNodeId;
         return (
           <Node
             key={node.id}
-            node={node}
-            nodeFillPaint={paints.nodeFill}
-            nodeStrokePaint={
-              isSelected ? paints.selectedNodeStroke : paints.nodeStroke
-            }
-            textPaint={paints.text}
+            node={{ ...node, position: getDisplayPosition(node) }}
+            colors={isSelected ? selectedColors : nodeColors}
+            isSelected={isSelected}
           />
         );
       });
+
+      return (
+        <>
+          {connections}
+          {nodeElements}
+        </>
+      );
     },
-    [selectedNodeId, paints]
+    [
+      edges,
+      nodeMap,
+      connectionColor,
+      selectedNodeId,
+      selectedColors,
+      nodeColors,
+      getDisplayPosition,
+    ]
   );
 
   return (
     <View
       className="flex-1"
       style={{ backgroundColor: colors.background }}
-      onLayout={(event) => {
-        const { width, height } = event.nativeEvent.layout;
-        setCanvasSize({ width, height });
-      }}
+      onLayout={(e) =>
+        setCanvasSize({
+          width: e.nativeEvent.layout.width,
+          height: e.nativeEvent.layout.height,
+        })
+      }
     >
-      <GestureHandler onSingleTap={handleNodeTap}>
-        {(matrix, focalPoint) => {
-          return (
-            <Canvas style={{ flex: 1 }}>
-              {/* Viewport overlay for development */}
-              {/* <ViewportVisualization screenSize={canvasSize} /> */}
-
-              {/* World content with gesture transforms */}
-              <Group matrix={matrix}>
-                <ViewportCulling
-                  matrix={matrix}
-                  nodes={nodes}
-                  screenSize={canvasSize}
-                >
-                  {(visibleNodes) => (
-                    <>
-                      {/* Draw connections */}
-                      {renderConnections(visibleNodes)}
-                      {/* Draw nodes */}
-                      {renderNodes(visibleNodes)}
-                    </>
-                  )}
-                </ViewportCulling>
-              </Group>
-            </Canvas>
-          );
-        }}
+      <GestureHandler
+        isDraggingNode={isDraggingNode}
+        onTap={handleTap}
+        onDrag={handleDrag}
+        onDragEnd={handleDragEnd}
+      >
+        {(matrix) => (
+          <Canvas style={{ flex: 1 }}>
+            <Group matrix={matrix}>
+              <ViewportCulling
+                matrix={matrix}
+                nodes={nodes}
+                screenSize={canvasSize}
+              >
+                {renderContent}
+              </ViewportCulling>
+            </Group>
+          </Canvas>
+        )}
       </GestureHandler>
 
-      {/* Node Details Panel */}
-      <NodeSelectionPanel
-        selectedNode={selectedNode}
-        colors={colors}
-        relatedNodes={relatedNodes}
-        documentId={documentId}
-        onClose={deselectNode}
-      />
+      {/* Float box - shown when node selected but chat panel closed */}
+      {selectedNode && !showChatPanel && (
+        <NodeFloatBox
+          node={selectedNode}
+          colors={colors}
+          onOpenChat={handleOpenChat}
+          onClose={handleClose}
+        />
+      )}
+
+      {/* Full chat panel */}
+      {showChatPanel && (
+        <NodeSelectionPanel
+          selectedNode={selectedNode}
+          colors={colors}
+          relatedNodes={relatedNodes}
+          documentId={documentId}
+          onClose={handleClose}
+        />
+      )}
     </View>
   );
 };

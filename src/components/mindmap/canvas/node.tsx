@@ -1,115 +1,141 @@
 import {
+  Group,
   matchFont,
   RoundedRect,
-  SkPaint,
   Text,
 } from "@shopify/react-native-skia";
-import React from "react";
+import React, { useMemo } from "react";
 import { Platform } from "react-native";
 
 import type { MindMapNode } from "@/features/mindmap";
 
-interface NodeProps {
-  node: MindMapNode;
-  nodeFillPaint: SkPaint;
-  nodeStrokePaint: SkPaint;
-  textPaint: SkPaint;
+// Node Configuration
+
+const NODE_CONFIG = {
+  minWidth: 100,
+  minHeight: 40,
+  padding: { x: 16, y: 12 },
+  cornerRadius: 12,
+} as const;
+
+const FONT_SIZES = {
+  root: 14,
+  branch: 12,
+  leaf: 11,
+} as const;
+
+// Types
+
+interface NodeColors {
+  fill: string;
+  stroke: string;
+  text: string;
 }
 
-const MIN_WIDTH = 80;
-const MIN_HEIGHT = 32;
-const PADDING = 12;
-const FONT_SIZE = 12;
+interface NodeProps {
+  node: MindMapNode;
+  colors?: NodeColors;
+  isSelected?: boolean;
+}
 
-const font = matchFont({
-  fontFamily: Platform.OS === "ios" ? "Helvetica" : "sans-serif",
-  fontSize: FONT_SIZE,
-});
+const DEFAULT_COLORS: NodeColors = {
+  fill: "#1e293b",
+  stroke: "#475569",
+  text: "#f1f5f9",
+};
+
+// Pre-create fonts (module level for max performance)
+const fonts = {
+  root: matchFont({
+    fontFamily: Platform.OS === "ios" ? "Helvetica Neue" : "sans-serif",
+    fontSize: FONT_SIZES.root,
+    fontWeight: "bold",
+  }),
+  branch: matchFont({
+    fontFamily: Platform.OS === "ios" ? "Helvetica Neue" : "sans-serif",
+    fontSize: FONT_SIZES.branch,
+  }),
+  leaf: matchFont({
+    fontFamily: Platform.OS === "ios" ? "Helvetica Neue" : "sans-serif",
+    fontSize: FONT_SIZES.leaf,
+  }),
+};
+
+// Node Component (optimized - no shadows for performance)
 
 const Node = ({
   node,
-  nodeFillPaint,
-  nodeStrokePaint,
-  textPaint,
+  colors = DEFAULT_COLORS,
+  isSelected = false,
 }: NodeProps) => {
-  // Calculate text dimensions and node size
-  const nodeDimensions = React.useMemo(() => {
-    if (!node.label) {
-      return {
-        width: MIN_WIDTH,
-        height: MIN_HEIGHT,
-        textWidth: 0,
-        textHeight: FONT_SIZE,
-      };
-    }
+  const level = node.level ?? 0;
+  const font =
+    level === 0 ? fonts.root : level <= 2 ? fonts.branch : fonts.leaf;
+  const fontSize =
+    level === 0
+      ? FONT_SIZES.root
+      : level <= 2
+        ? FONT_SIZES.branch
+        : FONT_SIZES.leaf;
 
-    const textMetrics = font.measureText(node.label);
-    const textWidth = textMetrics.width;
-    const textHeight = FONT_SIZE; // Approximate line height
-
-    const nodeWidth = Math.max(MIN_WIDTH, textWidth + PADDING * 2);
-    const nodeHeight = Math.max(MIN_HEIGHT, textHeight + PADDING * 2);
+  const dimensions = useMemo(() => {
+    const label = node.label || "";
+    const textMetrics = font.measureText(label);
 
     return {
-      width: nodeWidth,
-      height: nodeHeight,
-      textWidth,
-      textHeight,
+      width: Math.max(
+        NODE_CONFIG.minWidth,
+        textMetrics.width + NODE_CONFIG.padding.x * 2
+      ),
+      height: Math.max(
+        NODE_CONFIG.minHeight,
+        fontSize + NODE_CONFIG.padding.y * 2
+      ),
+      textWidth: textMetrics.width,
     };
-  }, [node.label]);
+  }, [node.label, font, fontSize]);
 
-  const {
-    width: nodeWidth,
-    height: nodeHeight,
-    textWidth,
-    textHeight,
-  } = nodeDimensions;
+  const position = node.position ?? { x: 0, y: 0 };
+  const { width, height, textWidth } = dimensions;
 
-  const position = node.position || { x: 0, y: 0 };
+  const x = position.x - width / 2;
+  const y = position.y - height / 2;
+  const textX = position.x - textWidth / 2;
+  const textY = position.y + fontSize / 3;
 
   return (
-    <React.Fragment>
-      {/* Node shadow */}
+    <Group>
+      {/* Node background */}
       <RoundedRect
-        x={position.x - nodeWidth / 2 + 2}
-        y={position.y - nodeHeight / 2 + 2}
-        width={nodeWidth}
-        height={nodeHeight}
-        r={nodeHeight / 2}
-        color="#000000"
-        opacity={0.1}
-      />
-
-      {/* Main node */}
-      <RoundedRect
-        x={position.x - nodeWidth / 2}
-        y={position.y - nodeHeight / 2}
-        width={nodeWidth}
-        height={nodeHeight}
-        r={nodeHeight / 2}
-        paint={nodeFillPaint}
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        r={NODE_CONFIG.cornerRadius}
+        color={colors.fill}
       />
 
       {/* Node border */}
       <RoundedRect
-        x={position.x - nodeWidth / 2}
-        y={position.y - nodeHeight / 2}
-        width={nodeWidth}
-        height={nodeHeight}
-        r={nodeHeight / 2}
-        paint={nodeStrokePaint}
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        r={NODE_CONFIG.cornerRadius}
+        color={colors.stroke}
         style="stroke"
+        strokeWidth={isSelected ? 3 : 1.5}
       />
 
-      {/* Node text */}
+      {/* Node label */}
       <Text
-        x={position.x - textWidth / 2}
-        y={position.y + textHeight / 2 - 2} // Adjust for baseline
-        text={node.label}
+        x={textX}
+        y={textY}
+        text={node.label ?? ""}
         font={font}
-        paint={textPaint}
+        color={colors.text}
       />
-    </React.Fragment>
+    </Group>
   );
 };
 
