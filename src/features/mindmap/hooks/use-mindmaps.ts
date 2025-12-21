@@ -192,6 +192,10 @@ export function useMindmap(id: string | null) {
     ) => {
       await nodeQueries.updatePositionsBatch(updates);
     },
+    onSuccess: () => {
+      if (id)
+        queryClient.invalidateQueries({ queryKey: mindmapKeys.detail(id) });
+    },
   });
 
   // Node: update data

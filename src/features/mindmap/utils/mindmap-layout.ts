@@ -1,217 +1,132 @@
 import type { MindMapNode, MindmapData } from "../types";
 
-interface LayoutNode {
+interface TreeNode {
   id: string;
-  level: number;
   children: string[];
-  angle?: number;
-  radius?: number;
+  parent?: string;
+  weight: number; // Number of descendants + 1 (self)
 }
 
 /**
- * Radial Tree Layout Algorithm for Mindmaps
- * - Places root node at center (0, 0)
- * - Arranges children in concentric circles by level
- * - Evenly distributes nodes to avoid overlap
- * - Modern, clear visual hierarchy
+ * Weighted Sector-Based Radial Layout Algorithm
+ *
+ * Improvements over standard Radial Tree Layout:
+ * - Distributes angles based on "weight" (descendant count) instead of equally
+ * - Nodes with more descendants get wider sectors, reducing overlap
+ * - Subtrees are grouped naturally
+ *
+ * @param nodes - Array of mindmap nodes
+ * @param edges - Array of connections between nodes
+ * @returns Nodes with updated positions
  */
-export function calculateRadialLayout(
+export function calculateWeightedRadialLayout(
   nodes: MindMapNode[],
   edges: MindmapData["edges"]
 ): MindMapNode[] {
   if (nodes.length === 0) return nodes;
 
-  // Step 1: Build hierarchy (find root and levels)
-  const nodeMap = new Map<string, LayoutNode>();
-  const childToParent = new Map<string, string>();
+  // Configuration
+  const RADIUS_STEP = 180; // Distance between levels
+  const MIN_ANGLE_GAP = 0.05; // Minimum gap between siblings (radians)
 
-  // Initialize nodes
-  nodes.forEach((node) => {
-    nodeMap.set(node.id, {
-      id: node.id,
-      level: 0,
-      children: [],
-    });
-  });
-
-  // Build connections from edges
-  edges.forEach((edge) => {
-    const parentNode = nodeMap.get(edge.from);
-    if (parentNode) {
-      parentNode.children.push(edge.to);
-      childToParent.set(edge.to, edge.from);
-    }
-  });
-
-  // Find root node (node with no parent)
-  let rootId: string | undefined;
-  for (const node of nodes) {
-    if (!childToParent.has(node.id)) {
-      rootId = node.id;
-      break;
-    }
-  }
-
-  // Fallback: use first node if no clear root
-  if (!rootId) {
-    rootId = nodes[0].id;
-  }
-
-  // Step 2: Calculate levels using BFS
-  const queue: string[] = [rootId];
-  const visited = new Set<string>();
-
-  while (queue.length > 0) {
-    const currentId = queue.shift();
-    if (!currentId) continue;
-
-    if (visited.has(currentId)) continue;
-    visited.add(currentId);
-
-    const current = nodeMap.get(currentId);
-    if (!current) continue;
-
-    // Process children
-    current.children.forEach((childId) => {
-      if (!visited.has(childId)) {
-        const child = nodeMap.get(childId);
-        if (child) {
-          child.level = current.level + 1;
-          queue.push(childId);
-        }
-      }
-    });
-  }
-
-  // Step 3: Group nodes by level
-  const levelGroups = new Map<number, string[]>();
-  nodeMap.forEach((node, id) => {
-    const level = node.level;
-    if (!levelGroups.has(level)) {
-      levelGroups.set(level, []);
-    }
-    levelGroups.get(level)!.push(id);
-  });
-
-  // Step 4: Calculate positions
-  const BASE_RADIUS = 250; // Distance between levels
-  const MIN_ANGLE_SEPARATION = 15; // Minimum degrees between nodes
-
-  const positions = new Map<string, { x: number; y: number }>();
-
-  // Root at center
-  positions.set(rootId, { x: 0, y: 0 });
-
-  // Position nodes level by level
-  levelGroups.forEach((nodeIds, level) => {
-    if (level === 0) return; // Skip root
-
-    const radius = level * BASE_RADIUS;
-    const nodeCount = nodeIds.length;
-
-    // Calculate angular separation
-    const angleStep = 360 / Math.max(nodeCount, 1);
-    const actualAngleStep = Math.max(angleStep, MIN_ANGLE_SEPARATION);
-
-    // Distribute nodes evenly around the circle
-    nodeIds.forEach((nodeId, index) => {
-      const angle = index * actualAngleStep * (Math.PI / 180); // Convert to radians
-
-      const x = Math.cos(angle) * radius;
-      const y = Math.sin(angle) * radius;
-
-      positions.set(nodeId, { x, y });
-    });
-  });
-
-  // Step 5: Apply positions to nodes
-  return nodes.map((node) => {
-    const pos = positions.get(node.id) || { x: 0, y: 0 };
-    return {
-      ...node,
-      position: pos,
-    };
-  });
-}
-
-/**
- * Compact Radial Layout - Better for dense graphs
- * Uses parent angle to position children in sectors
- */
-export function calculateCompactRadialLayout(
-  nodes: MindMapNode[],
-  edges: MindmapData["edges"]
-): MindMapNode[] {
-  if (nodes.length === 0) return nodes;
-
-  // Build hierarchy
-  const nodeMap = new Map<
-    string,
-    { node: MindMapNode; children: string[]; parent?: string }
-  >();
+  // Step 1: Build tree structure
+  const treeMap = new Map<string, TreeNode>();
 
   nodes.forEach((node) => {
-    nodeMap.set(node.id, { node, children: [] });
+    treeMap.set(node.id, { id: node.id, children: [], weight: 1 });
   });
 
   edges.forEach((edge) => {
-    const parentNode = nodeMap.get(edge.from);
-    const childNode = nodeMap.get(edge.to);
-    if (parentNode && childNode) {
-      parentNode.children.push(edge.to);
-      childNode.parent = edge.from;
+    const parent = treeMap.get(edge.from);
+    const child = treeMap.get(edge.to);
+    if (parent && child) {
+      parent.children.push(edge.to);
+      child.parent = edge.from;
     }
   });
 
-  // Find root
-  const rootId =
-    nodes.find((n) => !nodeMap.get(n.id)?.parent)?.id || nodes[0].id;
+  // Find root (node without parent)
+  const rootId = nodes.find((n) => !treeMap.get(n.id)?.parent)?.id;
+  if (!rootId) return nodes;
 
+  // Step 2: Calculate weights (number of descendants + self)
+  function calculateWeight(nodeId: string): number {
+    const node = treeMap.get(nodeId);
+    if (!node) return 0;
+
+    if (node.children.length === 0) {
+      node.weight = 1;
+    } else {
+      node.weight =
+        1 + node.children.reduce((sum, id) => sum + calculateWeight(id), 0);
+    }
+    return node.weight;
+  }
+
+  calculateWeight(rootId);
+
+  // Step 3: Assign positions using weighted sectors
   const positions = new Map<string, { x: number; y: number }>();
-  const BASE_RADIUS = 200;
 
-  // Recursive layout function
   function layoutSubtree(
     nodeId: string,
     startAngle: number,
     endAngle: number,
     level: number
   ) {
-    const data = nodeMap.get(nodeId);
-    if (!data) return;
+    const node = treeMap.get(nodeId);
+    if (!node) return;
 
-    const radius = level * BASE_RADIUS;
-    const midAngle = (startAngle + endAngle) / 2;
-
-    // Position this node
+    // Position this node at center of its sector
     if (level === 0) {
       positions.set(nodeId, { x: 0, y: 0 });
     } else {
-      const x = Math.cos(midAngle) * radius;
-      const y = Math.sin(midAngle) * radius;
-      positions.set(nodeId, { x, y });
-    }
-
-    // Layout children
-    const children = data.children;
-    if (children.length > 0) {
-      const angleRange = endAngle - startAngle;
-      const anglePerChild = angleRange / children.length;
-
-      children.forEach((childId, index) => {
-        const childStart = startAngle + index * anglePerChild;
-        const childEnd = childStart + anglePerChild;
-        layoutSubtree(childId, childStart, childEnd, level + 1);
+      const midAngle = (startAngle + endAngle) / 2;
+      const radius = level * RADIUS_STEP;
+      positions.set(nodeId, {
+        x: Math.cos(midAngle) * radius,
+        y: Math.sin(midAngle) * radius,
       });
     }
+
+    // Layout children with weighted sectors
+    const children = node.children;
+    if (children.length === 0) return;
+
+    // Calculate total weight of all children
+    const totalWeight = children.reduce(
+      (sum, id) => sum + (treeMap.get(id)?.weight ?? 1),
+      0
+    );
+
+    // Available angle range for children
+    const availableAngle = endAngle - startAngle;
+
+    // Distribute angles proportionally based on weight
+    let currentAngle = startAngle;
+
+    children.forEach((childId) => {
+      const childWeight = treeMap.get(childId)?.weight ?? 1;
+      const proportion = childWeight / totalWeight;
+      const childAngleSize = Math.max(
+        availableAngle * proportion - MIN_ANGLE_GAP,
+        MIN_ANGLE_GAP
+      );
+
+      const childStartAngle = currentAngle + MIN_ANGLE_GAP / 2;
+      const childEndAngle = currentAngle + childAngleSize;
+
+      layoutSubtree(childId, childStartAngle, childEndAngle, level + 1);
+      currentAngle = childEndAngle + MIN_ANGLE_GAP / 2;
+    });
   }
 
-  // Start layout from root
+  // Start layout from root, covering full circle (0 to 2π)
   layoutSubtree(rootId, 0, 2 * Math.PI, 0);
 
-  // Apply positions
+  // Apply calculated positions to nodes
   return nodes.map((node) => ({
     ...node,
-    position: positions.get(node.id) || { x: 0, y: 0 },
+    position: positions.get(node.id) ?? node.position,
   }));
 }

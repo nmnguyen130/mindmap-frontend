@@ -216,33 +216,46 @@ class SyncService {
     }
   }
 
-  // PULL: Backend → Local
+  // PULL: Backend → Local (Two-Step Approach)
   private async pullChanges(): Promise<SyncResult> {
     let synced = 0;
     const conflictItems: ConflictItem[] = [];
 
     try {
       const lastSync = await changeQueries.getLastSyncTimestamp();
-      const result = await fetchWithAuth<RemoteMindmap[]>(
+
+      // Step 1: Fetch list (metadata only) to identify changes
+      const listResult = await fetchWithAuth<RemoteMindmap[]>(
         `/api/mindmaps?since=${lastSync}`
       );
 
-      if (result.error) throw new Error(result.error);
+      if (listResult.error) throw new Error(listResult.error);
 
-      const remoteMindmaps = result.data || [];
+      const remoteMindmaps = listResult.data || [];
       const remoteIds = remoteMindmaps.map((r) => r.id);
       const localMap = await mindmapQueries.getByLocalIds(remoteIds);
+
+      // Categorize: new inserts vs updates needing full fetch
+      const idsToFetchFull: string[] = [];
 
       for (const remote of remoteMindmaps) {
         const local = localMap.get(remote.id);
 
         if (!local) {
-          await this.insertFromRemote(remote);
-          synced++;
+          // New mindmap from server
+          if (remote.nodes !== undefined) {
+            // List already has full data (rare), insert directly
+            await this.insertFromRemote(remote);
+            synced++;
+          } else {
+            // Need to fetch full data
+            idsToFetchFull.push(remote.id);
+          }
         } else if (remote.version > local.version) {
-          await this.updateFromRemote(remote);
-          synced++;
+          // Remote is newer, need full data to update
+          idsToFetchFull.push(remote.id);
         } else if (!local.is_synced && remote.version === local.version) {
+          // Conflict: both modified same version
           conflictItems.push({
             id: remote.id,
             table: "mindmaps",
@@ -253,6 +266,35 @@ class SyncService {
             localUpdatedAt: local.updated_at,
             remoteUpdatedAt: remote.updated_at,
           });
+        }
+      }
+
+      // Step 2: Fetch full data for changed mindmaps
+      for (const id of idsToFetchFull) {
+        try {
+          const fullResult = await fetchWithAuth<RemoteMindmap>(
+            `/api/mindmaps/${id}`
+          );
+
+          if (fullResult.error) {
+            console.error(
+              `[Sync] Failed to fetch full mindmap ${id}:`,
+              fullResult.error
+            );
+            continue;
+          }
+
+          if (fullResult.data) {
+            const local = localMap.get(id);
+            if (!local) {
+              await this.insertFromRemote(fullResult.data);
+            } else {
+              await this.updateFromRemote(fullResult.data);
+            }
+            synced++;
+          }
+        } catch (err) {
+          console.error(`[Sync] Error fetching mindmap ${id}:`, err);
         }
       }
 

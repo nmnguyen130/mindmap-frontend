@@ -27,7 +27,7 @@ interface NodeSelectionPanelProps {
   selectedNode: MindMapNode | null;
   colors: ThemeColors;
   relatedNodes?: MindMapNode[];
-  mindmapId: string | null;
+  documentId?: string;
   onClose?: () => void;
 }
 
@@ -35,7 +35,7 @@ const NodeSelectionPanel = ({
   selectedNode,
   colors,
   relatedNodes = [],
-  mindmapId,
+  documentId,
   onClose,
 }: NodeSelectionPanelProps) => {
   const [aiQuery, setAiQuery] = useState<string>("");
@@ -47,7 +47,7 @@ const NodeSelectionPanel = ({
   // RAG Chat hook
   const { messages, isStreaming, sendMessage, generateSummary, clear } =
     useRagChat({
-      documentId: mindmapId || "",
+      documentId,
       onError: (error) => {
         console.error("RAG Chat error:", error);
       },
@@ -92,11 +92,11 @@ const NodeSelectionPanel = ({
 
   // Auto-generate summary when node is selected
   useEffect(() => {
-    if (selectedNode && mindmapId && messages.length === 0) {
+    if (selectedNode && messages.length === 0) {
       // Generate summary as first message
       generateSummary(selectedNode.label, selectedNode.keywords || []);
     }
-  }, [selectedNode?.id, mindmapId]);
+  }, [selectedNode?.id, documentId]);
 
   // Clear messages when node changes
   useEffect(() => {
@@ -381,7 +381,7 @@ const NodeSelectionPanel = ({
                         style={{ color: colors.foreground }}
                         onSubmitEditing={handleAiQuery}
                         returnKeyType="send"
-                        editable={!isStreaming && !!mindmapId}
+                        editable={!isStreaming}
                       />
                       <Pressable
                         onPress={handleAiQuery}

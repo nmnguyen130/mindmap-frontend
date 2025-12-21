@@ -11,10 +11,7 @@ export {
 } from "./store/mindmap-ui-store";
 
 // Utils
-export {
-  calculateRadialLayout,
-  calculateCompactRadialLayout,
-} from "./utils/mindmap-layout";
+export { calculateWeightedRadialLayout } from "./utils/mindmap-layout";
 
 // Types
 export * from "./types";

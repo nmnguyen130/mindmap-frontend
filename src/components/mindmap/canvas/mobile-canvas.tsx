@@ -5,9 +5,7 @@ import { View } from "react-native";
 import { useTheme } from "@/components/providers/theme-provider";
 import type { MindMapNode, MindmapData } from "@/features/mindmap";
 import { getNodeBox } from "@/features/mindmap/utils/node-utils";
-import { useFPSDetection } from "@/shared/hooks/use-fps-detection";
 
-import FPSOverlay from "../ui/fps-overlay";
 import NodeSelectionPanel from "../ui/node-selection-panel";
 
 import Connection from "./connection";
@@ -18,19 +16,17 @@ import ViewportCulling from "./viewport-culling";
 interface MobileCanvasProps {
   nodes: MindMapNode[];
   edges: MindmapData["edges"];
-  mindmapId?: string | null;
+  mindmapId: string;
+  documentId?: string;
 }
 
 const MobileCanvas = ({
   nodes,
   edges,
-  mindmapId = null,
+  mindmapId,
+  documentId,
 }: MobileCanvasProps) => {
   const { colors, isDark } = useTheme();
-
-  // FPS monitoring for development
-  const { isInteracting, fpsMetrics, startInteraction, stopInteraction } =
-    useFPSDetection();
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
@@ -194,11 +190,7 @@ const MobileCanvas = ({
         setCanvasSize({ width, height });
       }}
     >
-      <GestureHandler
-        onSingleTap={handleNodeTap}
-        onInteractionStart={startInteraction}
-        onInteractionEnd={stopInteraction}
-      >
+      <GestureHandler onSingleTap={handleNodeTap}>
         {(matrix, focalPoint) => {
           return (
             <Canvas style={{ flex: 1 }}>
@@ -227,15 +219,12 @@ const MobileCanvas = ({
         }}
       </GestureHandler>
 
-      {/* FPS Overlay - for development */}
-      <FPSOverlay isVisible={isInteracting} metrics={fpsMetrics} />
-
       {/* Node Details Panel */}
       <NodeSelectionPanel
         selectedNode={selectedNode}
         colors={colors}
         relatedNodes={relatedNodes}
-        mindmapId={mindmapId}
+        documentId={documentId}
         onClose={deselectNode}
       />
     </View>

@@ -5,11 +5,19 @@ import MobileCanvas from "./mobile-canvas";
 interface CanvasProps {
   nodes: MindMapNode[];
   edges: MindmapData["edges"];
-  mindmapId?: string | null;
+  mindmapId: string;
+  documentId?: string;
 }
 
-const Canvas = ({ nodes, edges, mindmapId }: CanvasProps) => {
-  return <MobileCanvas nodes={nodes} edges={edges} mindmapId={mindmapId} />;
+const Canvas = ({ nodes, edges, mindmapId, documentId }: CanvasProps) => {
+  return (
+    <MobileCanvas
+      nodes={nodes}
+      edges={edges}
+      mindmapId={mindmapId}
+      documentId={documentId}
+    />
+  );
 };
 
 export default Canvas;

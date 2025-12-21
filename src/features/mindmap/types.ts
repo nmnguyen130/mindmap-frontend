@@ -33,6 +33,7 @@ export interface MindMap {
   title: string;
   central_topic?: string;
   summary?: string;
+  document_id?: string;
   createdAt: Date;
   updatedAt: Date;
   nodes: MindMapNode[];
@@ -76,6 +77,7 @@ export function fullMindmapToUI(full: FullMindMap): MindMap {
     title: full.mindMap.title,
     central_topic: full.mindMap.central_topic,
     summary: full.mindMap.summary,
+    document_id: full.mindMap.document_id,
     createdAt: new Date(full.mindMap.created_at),
     updatedAt: new Date(full.mindMap.updated_at),
     nodes: full.nodes.map(dbRowToMindMapNode),

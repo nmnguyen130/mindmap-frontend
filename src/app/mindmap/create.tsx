@@ -123,6 +123,7 @@ const CreateMindMapScreen = () => {
             title: result.mindmap.title,
             central_topic: result.mindmap.mindmap_data.central_topic,
             summary: result.mindmap.mindmap_data.summary,
+            document_id: result.document.id,
             nodes: transformedNodes,
             edges: transformedEdges,
           });

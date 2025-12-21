@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 
 import { SyncController } from "../services/sync-controller";
+import { SYNC_CONFIG } from "../config";
 import { useAuthStore } from "@/features/auth/store/auth-store";
 import { ConflictModal } from "@/components/ui/modal/conflict-modal";
 
@@ -15,7 +16,7 @@ interface SyncProviderProps {
  */
 export const SyncProvider: React.FC<SyncProviderProps> = ({
   children,
-  autoSyncInterval = 60000,
+  autoSyncInterval = SYNC_CONFIG.AUTO_SYNC_INTERVAL_MS,
 }) => {
   const controllerRef = useRef<SyncController | null>(null);
   const intervalRef = useRef(autoSyncInterval);
@@ -26,8 +27,14 @@ export const SyncProvider: React.FC<SyncProviderProps> = ({
     controllerRef.current?.updateInterval(autoSyncInterval);
   }, [autoSyncInterval]);
 
-  // Create controller once on mount
+  // Create controller once on mount (only if sync enabled)
   useEffect(() => {
+    // Skip sync if disabled in config
+    if (!SYNC_CONFIG.SYNC_ENABLED) {
+      console.log("[SyncProvider] Sync is DISABLED via config");
+      return;
+    }
+
     const controller = new SyncController({
       autoSyncIntervalMs: intervalRef.current,
       getAccessToken: () => useAuthStore.getState().accessToken,
