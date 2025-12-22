@@ -1,5 +1,11 @@
 import { Canvas, Group } from "@shopify/react-native-skia";
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { View } from "react-native";
 import { makeMutable, SharedValue } from "react-native-reanimated";
 
@@ -51,14 +57,14 @@ const MobileCanvas = ({
   const isDraggingNode = useRef(makeMutable(false)).current;
   const activeNodeId = useRef(makeMutable<string | null>(null)).current;
 
-  // Shared positions
+  // Shared positions - stable map reference
   const positionsRef = useRef(new Map<string, NodePosition>());
 
-  // Sync positions map with nodes
+  // Build/update nodePositions map (only creates new entries, no .value writes)
   const nodePositions = useMemo(() => {
     const map = positionsRef.current;
 
-    // Add new nodes
+    // Add new nodes only
     nodes.forEach((node) => {
       if (!map.has(node.id)) {
         map.set(node.id, {
@@ -75,6 +81,20 @@ const MobileCanvas = ({
     }
 
     return map;
+  }, [nodes]);
+
+  // Sync existing positions AFTER render (avoids Reanimated warning)
+  useEffect(() => {
+    nodes.forEach((node) => {
+      const pos = positionsRef.current.get(node.id);
+      if (pos) {
+        const newX = node.position?.x ?? 0;
+        const newY = node.position?.y ?? 0;
+        // Only update if changed (to avoid unnecessary writes)
+        if (pos.x.value !== newX) pos.x.value = newX;
+        if (pos.y.value !== newY) pos.y.value = newY;
+      }
+    });
   }, [nodes]);
 
   // Node map

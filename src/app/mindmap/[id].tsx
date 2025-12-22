@@ -61,6 +61,14 @@ const MindMapScreen = () => {
     }
   }, [map, updateNodePositions]);
 
+  // Single node move handler - persist to database
+  const handleNodeMove = useCallback(
+    (nodeId: string, x: number, y: number) => {
+      updateNodePositions.mutate([{ id: nodeId, x, y }]);
+    },
+    [updateNodePositions]
+  );
+
   // Loading state
   if (isLoading) {
     return (
@@ -200,6 +208,7 @@ const MindMapScreen = () => {
             edges={map.edges}
             mindmapId={id}
             documentId={map.document_id}
+            onNodeMove={handleNodeMove}
           />
         ) : (
           <View className="flex-1 items-center justify-center px-6">
