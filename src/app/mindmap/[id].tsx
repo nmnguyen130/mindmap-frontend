@@ -1,4 +1,5 @@
 import { MaterialIcons } from "@expo/vector-icons";
+import * as Crypto from "expo-crypto";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
@@ -27,9 +28,16 @@ const MindMapScreen = () => {
   }, [id, setCurrentMap, resetUI]);
 
   // Fetch mindmap data
-  const { data, isLoading, error, updateNodePositions } = useMindmap(
-    id ?? null
-  );
+  const {
+    data,
+    isLoading,
+    error,
+    updateNodePositions,
+    addNode,
+    addConnection,
+    deleteNode,
+    deleteConnection,
+  } = useMindmap(id ?? null);
 
   // Transform DB data to UI format
   const map = useMemo(() => {
@@ -67,6 +75,47 @@ const MindMapScreen = () => {
       updateNodePositions.mutate([{ id: nodeId, x, y }]);
     },
     [updateNodePositions]
+  );
+
+  // Add new node handler
+  const handleAddNode = useCallback(() => {
+    if (!id) return;
+    addNode.mutate({
+      id: Crypto.randomUUID(),
+      mindmap_id: id,
+      label: "New Node",
+      level: 1,
+      position_x: 0,
+      position_y: 0,
+    });
+  }, [id, addNode]);
+
+  // Add connection handler
+  const handleAddConnection = useCallback(
+    (fromId: string, toId: string) => {
+      addConnection.mutate({
+        id: Crypto.randomUUID(),
+        from_node_id: fromId,
+        to_node_id: toId,
+      });
+    },
+    [addConnection]
+  );
+
+  // Delete node handler
+  const handleDeleteNode = useCallback(
+    (nodeId: string) => {
+      deleteNode.mutate(nodeId);
+    },
+    [deleteNode]
+  );
+
+  // Delete connection handler
+  const handleDeleteConnection = useCallback(
+    (connectionId: string) => {
+      deleteConnection.mutate(connectionId);
+    },
+    [deleteConnection]
   );
 
   // Loading state
@@ -209,6 +258,10 @@ const MindMapScreen = () => {
             mindmapId={id}
             documentId={map.document_id}
             onNodeMove={handleNodeMove}
+            onAddNode={handleAddNode}
+            onAddConnection={handleAddConnection}
+            onDeleteNode={handleDeleteNode}
+            onDeleteConnection={handleDeleteConnection}
           />
         ) : (
           <View className="flex-1 items-center justify-center px-6">

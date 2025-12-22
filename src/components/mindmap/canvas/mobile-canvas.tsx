@@ -6,15 +6,16 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { makeMutable, SharedValue } from "react-native-reanimated";
 
 import { useTheme } from "@/components/providers/theme-provider";
-import type { MindMapNode, MindmapData } from "@/features/mindmap";
+import type { MindMapEdge, MindMapNode, MindmapData } from "@/features/mindmap";
 import { getNodeBox } from "@/features/mindmap/utils/node-utils";
 
 import NodeFloatBox from "../ui/node-float-box";
 import NodeSelectionPanel from "../ui/node-selection-panel";
+import FabButton from "../ui/fab-button";
 
 import Connection from "./connection";
 import GestureHandler from "./gesture-handler";
@@ -34,6 +35,10 @@ interface MobileCanvasProps {
   mindmapId: string;
   documentId?: string;
   onNodeMove?: (nodeId: string, x: number, y: number) => void;
+  onAddNode?: () => void;
+  onAddConnection?: (fromId: string, toId: string) => void;
+  onDeleteNode?: (nodeId: string) => void;
+  onDeleteConnection?: (connectionId: string) => void;
 }
 
 // Component
@@ -44,6 +49,10 @@ const MobileCanvas = ({
   mindmapId,
   documentId,
   onNodeMove,
+  onAddNode,
+  onAddConnection,
+  onDeleteNode,
+  onDeleteConnection,
 }: MobileCanvasProps) => {
   const { colors } = useTheme();
 
@@ -52,35 +61,37 @@ const MobileCanvas = ({
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [showChatPanel, setShowChatPanel] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  const [connectMode, setConnectMode] = useState<{ from?: string } | null>(
+    null
+  );
 
   // Drag state
   const isDraggingNode = useRef(makeMutable(false)).current;
   const activeNodeId = useRef(makeMutable<string | null>(null)).current;
 
-  // Shared positions - stable map reference
+  // Shared positions - stable mutable values, but return new Map on nodes change
   const positionsRef = useRef(new Map<string, NodePosition>());
 
-  // Build/update nodePositions map (only creates new entries, no .value writes)
+  // Build/update nodePositions map - returns NEW Map reference on nodes change
   const nodePositions = useMemo(() => {
-    const map = positionsRef.current;
+    const oldMap = positionsRef.current;
+    const newMap = new Map<string, NodePosition>();
 
-    // Add new nodes only
+    // Copy existing or create new entries
     nodes.forEach((node) => {
-      if (!map.has(node.id)) {
-        map.set(node.id, {
+      const existing = oldMap.get(node.id);
+      if (existing) {
+        newMap.set(node.id, existing);
+      } else {
+        newMap.set(node.id, {
           x: makeMutable(node.position?.x ?? 0),
           y: makeMutable(node.position?.y ?? 0),
         });
       }
     });
 
-    // Remove stale nodes
-    const nodeIds = new Set(nodes.map((n) => n.id));
-    for (const id of map.keys()) {
-      if (!nodeIds.has(id)) map.delete(id);
-    }
-
-    return map;
+    positionsRef.current = newMap;
+    return newMap;
   }, [nodes]);
 
   // Sync existing positions AFTER render (avoids Reanimated warning)
@@ -90,7 +101,6 @@ const MobileCanvas = ({
       if (pos) {
         const newX = node.position?.x ?? 0;
         const newY = node.position?.y ?? 0;
-        // Only update if changed (to avoid unnecessary writes)
         if (pos.x.value !== newX) pos.x.value = newX;
         if (pos.y.value !== newY) pos.y.value = newY;
       }
@@ -158,10 +168,30 @@ const MobileCanvas = ({
     [nodes]
   );
 
-  // Tap: select node or deselect
+  // Tap: select node, deselect, or connect
   const handleTap = useCallback(
     (x: number, y: number) => {
       const node = findNodeAtPoint(x, y);
+
+      // Connect mode active
+      if (connectMode) {
+        if (node) {
+          if (!connectMode.from) {
+            // First tap: select "from" node
+            setConnectMode({ from: node.id });
+          } else if (node.id !== connectMode.from) {
+            // Second tap: complete connection
+            onAddConnection?.(connectMode.from, node.id);
+            setConnectMode(null);
+          }
+        } else {
+          // Tap empty: cancel connect mode
+          setConnectMode(null);
+        }
+        return;
+      }
+
+      // Normal mode
       if (node) {
         setSelectedNodeId(node.id);
         activeNodeId.value = node.id;
@@ -173,7 +203,7 @@ const MobileCanvas = ({
         isDraggingNode.value = false;
       }
     },
-    [findNodeAtPoint]
+    [findNodeAtPoint, connectMode, onAddConnection]
   );
 
   // Persist position (JS only once)
@@ -246,6 +276,7 @@ const MobileCanvas = ({
       onLayout={(e) => setCanvasSize(e.nativeEvent.layout)}
     >
       <GestureHandler
+        key={nodes.length}
         isDraggingNode={isDraggingNode}
         activeNodeId={activeNodeId}
         nodePositions={nodePositions}
@@ -271,8 +302,15 @@ const MobileCanvas = ({
       {selectedNode && !showChatPanel && (
         <NodeFloatBox
           node={selectedNode}
+          nodes={nodes}
+          edges={edges as MindMapEdge[]}
           colors={colors}
           onOpenChat={handleOpenChat}
+          onDelete={() => {
+            onDeleteNode?.(selectedNode.id);
+            handleClose();
+          }}
+          onDeleteConnection={(connId) => onDeleteConnection?.(connId)}
           onClose={handleClose}
         />
       )}
@@ -285,6 +323,28 @@ const MobileCanvas = ({
           relatedNodes={relatedNodes}
           documentId={documentId}
           onClose={handleClose}
+        />
+      )}
+
+      {/* Connect mode indicator */}
+      {connectMode && (
+        <View
+          className="absolute top-24 left-4 right-4 rounded-full px-4 py-2 flex-row items-center justify-center"
+          style={{ backgroundColor: colors.primary }}
+        >
+          <Text style={{ color: colors.primaryForeground, fontSize: 14 }}>
+            {connectMode.from ? "Tap target node" : "Tap source node"}
+          </Text>
+        </View>
+      )}
+
+      {/* FAB - hide when node selected or in connect mode */}
+      {!showChatPanel && !selectedNode && !connectMode && (
+        <FabButton
+          actions={[
+            { icon: "add-circle-outline", onPress: () => onAddNode?.() },
+            { icon: "link", onPress: () => setConnectMode({}) },
+          ]}
         />
       )}
     </View>

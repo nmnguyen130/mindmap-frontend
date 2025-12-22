@@ -8,6 +8,10 @@ interface CanvasProps {
   mindmapId: string;
   documentId?: string;
   onNodeMove?: (nodeId: string, x: number, y: number) => void;
+  onAddNode?: () => void;
+  onAddConnection?: (fromId: string, toId: string) => void;
+  onDeleteNode?: (nodeId: string) => void;
+  onDeleteConnection?: (connectionId: string) => void;
 }
 
 const Canvas = ({
@@ -16,6 +20,10 @@ const Canvas = ({
   mindmapId,
   documentId,
   onNodeMove,
+  onAddNode,
+  onAddConnection,
+  onDeleteNode,
+  onDeleteConnection,
 }: CanvasProps) => {
   return (
     <MobileCanvas
@@ -24,6 +32,10 @@ const Canvas = ({
       mindmapId={mindmapId}
       documentId={documentId}
       onNodeMove={onNodeMove}
+      onAddNode={onAddNode}
+      onAddConnection={onAddConnection}
+      onDeleteNode={onDeleteNode}
+      onDeleteConnection={onDeleteConnection}
     />
   );
 };
