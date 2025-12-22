@@ -1,10 +1,6 @@
 import { useState, useCallback } from "react";
 import * as ragApi from "../services/rag-api";
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -16,12 +12,8 @@ interface UseRagChatOptions {
   onError?: (error: Error) => void;
 }
 
-// ============================================================================
-// React Hook for RAG Chat
-// ============================================================================
-
 /**
- * Hook for streaming RAG chat with document context
+ * Hook for streaming RAG chat with document context.
  */
 export const useRagChat = ({ documentId, onError }: UseRagChatOptions) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -29,28 +21,22 @@ export const useRagChat = ({ documentId, onError }: UseRagChatOptions) => {
 
   const sendMessage = useCallback(
     async (question: string) => {
-      // Early return if no documentId or invalid input
       if (!documentId || !question.trim() || isStreaming) return;
 
       // Add user message
-      const userMessage: ChatMessage = {
-        role: "user",
-        content: question,
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, userMessage]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: question, timestamp: new Date() },
+      ]);
       setIsStreaming(true);
 
-      // Add empty assistant message that we'll update
-      const assistantMessage: ChatMessage = {
-        role: "assistant",
-        content: "",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
+      // Add empty assistant message to update
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "", timestamp: new Date() },
+      ]);
 
-      let assistantContent = "";
+      let content = "";
 
       try {
         ragApi.streamChat(
@@ -60,23 +46,18 @@ export const useRagChat = ({ documentId, onError }: UseRagChatOptions) => {
             match_threshold: 0.0,
             match_count: 5,
           },
-          // onChunk
-          (content) => {
-            assistantContent += content;
+          (chunk) => {
+            content += chunk;
             setMessages((prev) => {
               const updated = [...prev];
               updated[updated.length - 1] = {
                 ...updated[updated.length - 1],
-                content: assistantContent,
+                content,
               };
               return updated;
             });
           },
-          // onComplete
-          () => {
-            setIsStreaming(false);
-          },
-          // onError
+          () => setIsStreaming(false),
           (error) => {
             console.error("Chat error:", error);
             onError?.(error);
@@ -95,9 +76,8 @@ export const useRagChat = ({ documentId, onError }: UseRagChatOptions) => {
   );
 
   const generateSummary = useCallback(
-    async (label: string, keywords: string[]) => {
-      const summaryQuestion = `Provide a brief summary of: ${label}`;
-      await sendMessage(summaryQuestion);
+    async (label: string) => {
+      await sendMessage(`Provide a brief summary of: ${label}`);
     },
     [sendMessage]
   );
@@ -107,11 +87,5 @@ export const useRagChat = ({ documentId, onError }: UseRagChatOptions) => {
     setIsStreaming(false);
   }, []);
 
-  return {
-    messages,
-    isStreaming,
-    sendMessage,
-    generateSummary,
-    clear,
-  };
+  return { messages, isStreaming, sendMessage, generateSummary, clear };
 };

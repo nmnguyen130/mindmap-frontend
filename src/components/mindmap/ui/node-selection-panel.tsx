@@ -1,418 +1,292 @@
 import { MaterialIcons } from "@expo/vector-icons";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import BottomSheet, {
+  BottomSheetBackdrop,
+  BottomSheetScrollView,
+  BottomSheetTextInput,
+} from "@gorhom/bottom-sheet";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Animated,
   Keyboard,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   Text,
-  TextInput,
+  TextStyle,
   View,
 } from "react-native";
 
 import { ThemeColors } from "@/components/providers/theme-provider";
 import { useRagChat } from "@/features/document/hooks/use-rag-chat";
 import type { MindMapNode } from "@/features/mindmap";
+import { renderMarkdown } from "@/lib/render-markdown";
 
-interface NodeSelectionPanelProps {
+interface Props {
   selectedNode: MindMapNode | null;
   colors: ThemeColors;
-  relatedNodes?: MindMapNode[];
   documentId?: string;
   onClose?: () => void;
 }
 
+const SNAP_POINTS = ["80%"];
+
+/**
+ * Bottom sheet panel for AI chat about selected node.
+ */
 const NodeSelectionPanel = ({
   selectedNode,
   colors,
-  relatedNodes = [],
   documentId,
   onClose,
-}: NodeSelectionPanelProps) => {
-  const [aiQuery, setAiQuery] = useState<string>("");
-  const slideAnim = useRef(new Animated.Value(600)).current;
-  const backdropAnim = useRef(new Animated.Value(0)).current;
-  const aiInputRef = useRef<TextInput>(null);
-  const chatScrollRef = useRef<ScrollView>(null);
+}: Props) => {
+  const [query, setQuery] = useState("");
+  const bottomSheetRef = useRef<BottomSheet>(null);
+  const scrollRef = useRef<any>(null);
 
-  // RAG Chat hook
   const { messages, isStreaming, sendMessage, generateSummary, clear } =
     useRagChat({
       documentId,
-      onError: (error) => {
-        console.error("RAG Chat error:", error);
-      },
+      onError: console.error,
     });
 
-  // Animate panel in/out
+  // Sheet control
   useEffect(() => {
-    if (selectedNode) {
-      Animated.parallel([
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 65,
-          friction: 9,
-        }),
-        Animated.timing(backdropAnim, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: 600,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(backdropAnim, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [selectedNode, slideAnim, backdropAnim]);
+    selectedNode
+      ? bottomSheetRef.current?.expand()
+      : bottomSheetRef.current?.close();
+  }, [selectedNode]);
 
-  // Sync AI query state
-  useEffect(() => {
-    setAiQuery("");
-  }, [selectedNode?.id]);
-
-  // Auto-generate summary when node is selected
+  // Auto-generate summary
   useEffect(() => {
     if (selectedNode && messages.length === 0) {
-      // Generate summary as first message
-      generateSummary(selectedNode.label, selectedNode.keywords || []);
+      generateSummary(selectedNode.label);
     }
-  }, [selectedNode?.id, documentId]);
+  }, [selectedNode?.id]);
 
-  // Clear messages when node changes
+  // Clear on node change
   useEffect(() => {
-    if (!selectedNode) {
-      clear();
-    }
-  }, [selectedNode, clear]);
+    if (!selectedNode) clear();
+    setQuery("");
+  }, [selectedNode?.id]);
 
-  // Auto-scroll to bottom when new message appears
+  // Auto-scroll
   useEffect(() => {
     if (messages.length > 0) {
-      setTimeout(() => {
-        chatScrollRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }, [messages.length]);
 
-  // Handle AI query submission
-  const handleAiQuery = useCallback(async () => {
-    if (!aiQuery.trim() || isStreaming) return;
-
-    await sendMessage(aiQuery);
-    setAiQuery("");
+  const handleSend = useCallback(async () => {
+    if (!query.trim() || isStreaming) return;
+    await sendMessage(query);
+    setQuery("");
     Keyboard.dismiss();
-  }, [aiQuery, isStreaming, sendMessage]);
+  }, [query, isStreaming, sendMessage]);
 
-  // Compute related topics summary
-  const relatedSummary = useMemo(() => {
-    if (relatedNodes.length === 0) return null;
-    if (relatedNodes.length <= 3) {
-      return relatedNodes.map((n) => n.label).join(", ");
-    }
-    return `${relatedNodes
-      .slice(0, 2)
-      .map((n) => n.label)
-      .join(", ")} and ${relatedNodes.length - 2} more`;
-  }, [relatedNodes]);
+  const renderBackdrop = useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        opacity={0.4}
+      />
+    ),
+    []
+  );
+
+  const handleChange = useCallback(
+    (index: number) => index === -1 && onClose?.(),
+    [onClose]
+  );
 
   if (!selectedNode) return null;
 
-  return (
-    <>
-      {/* Backdrop Overlay */}
-      <Animated.View
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
-          opacity: backdropAnim,
-        }}
-        pointerEvents={selectedNode ? "auto" : "none"}
-      >
-        <Pressable style={{ flex: 1 }} onPress={() => onClose?.()} />
-      </Animated.View>
+  const canSend = query.trim() && !isStreaming;
 
-      {/* Panel */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        className="absolute left-0 right-0 bottom-0"
-        keyboardVerticalOffset={0}
-        pointerEvents="box-none"
+  return (
+    <BottomSheet
+      ref={bottomSheetRef}
+      index={0}
+      snapPoints={SNAP_POINTS}
+      onChange={handleChange}
+      enablePanDownToClose
+      backdropComponent={renderBackdrop}
+      handleIndicatorStyle={{ backgroundColor: colors.border, width: 36 }}
+      backgroundStyle={{ backgroundColor: colors.surface }}
+    >
+      {/* Header */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: 16,
+          paddingBottom: 12,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+        }}
       >
-        <Animated.View
-          className="flex-1"
+        <Text
           style={{
-            transform: [{ translateY: slideAnim }],
+            flex: 1,
+            fontSize: 15,
+            fontWeight: "600",
+            color: colors.foreground,
           }}
-          pointerEvents="box-none"
+          numberOfLines={1}
         >
-          <View className="px-4 pb-6 flex-1" pointerEvents="box-none">
-            <View
-              className="rounded-3xl shadow-2xl overflow-hidden"
+          {selectedNode.label}
+        </Text>
+        <Pressable
+          onPress={onClose}
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 14,
+            backgroundColor: colors.secondary,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <MaterialIcons
+            name="close"
+            size={16}
+            color={colors.secondaryForeground}
+          />
+        </Pressable>
+      </View>
+
+      {/* Messages */}
+      <BottomSheetScrollView
+        ref={scrollRef}
+        contentContainerStyle={{ padding: 12, gap: 10, flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {messages.length === 0 && !isStreaming ? (
+          <View
+            style={{
+              flex: 1,
+              alignItems: "center",
+              justifyContent: "center",
+              opacity: 0.5,
+            }}
+          >
+            <MaterialIcons
+              name="chat-bubble-outline"
+              size={32}
+              color={colors.mutedForeground}
+            />
+            <Text
               style={{
-                backgroundColor: colors.surface,
-                maxHeight: "100%",
-                minHeight: "80%",
+                fontSize: 12,
+                color: colors.mutedForeground,
+                marginTop: 8,
               }}
             >
-              {/* Header */}
-              <View
-                className="px-4 pt-3 pb-2 border-b"
-                style={{ borderBottomColor: colors.border }}
-              >
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-1 mr-2">
-                    <Text
-                      className="text-base font-bold leading-tight"
-                      style={{ color: colors.foreground }}
-                      numberOfLines={2}
-                    >
-                      {selectedNode.label}
-                    </Text>
-                    {relatedSummary && (
-                      <Text
-                        className="text-xs mt-1"
-                        style={{ color: colors.mutedForeground }}
-                        numberOfLines={1}
-                      >
-                        Connected: {relatedSummary}
-                      </Text>
-                    )}
-                  </View>
-                  <Pressable
-                    onPress={() => onClose?.()}
-                    className="w-8 h-8 rounded-full items-center justify-center"
-                    style={{ backgroundColor: colors.secondary }}
-                  >
-                    <MaterialIcons
-                      name="close"
-                      size={18}
-                      color={colors.secondaryForeground}
-                    />
-                  </Pressable>
-                </View>
-              </View>
-
-              {/* Scrollable Content */}
-              <ScrollView
-                className="flex-1"
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-              >
-                {/* General Info Section */}
-                <View
-                  className="px-4 py-3 border-b"
-                  style={{ borderBottomColor: colors.border }}
-                >
-                  <Text
-                    className="text-xs font-bold uppercase mb-2"
-                    style={{ color: colors.mutedForeground }}
-                  >
-                    General Information
-                  </Text>
-
-                  {/* Keywords */}
-                  {selectedNode.keywords &&
-                    selectedNode.keywords.length > 0 && (
-                      <View className="mb-2">
-                        <Text
-                          className="text-xs mb-1"
-                          style={{ color: colors.mutedForeground }}
-                        >
-                          Keywords:
-                        </Text>
-                        <View className="flex-row flex-wrap gap-1.5">
-                          {selectedNode.keywords.map((keyword, idx) => (
-                            <View
-                              key={idx}
-                              className="px-2.5 py-1 rounded-full"
-                              style={{ backgroundColor: colors.primary + "20" }}
-                            >
-                              <Text
-                                className="text-xs font-medium"
-                                style={{ color: colors.primary }}
-                              >
-                                {keyword}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                      </View>
-                    )}
-
-                  {/* Level */}
-                  <View className="flex-row items-center gap-2 mb-2">
-                    <Text
-                      className="text-xs"
-                      style={{ color: colors.mutedForeground }}
-                    >
-                      Level:
-                    </Text>
-                    <Text
-                      className="text-xs font-semibold"
-                      style={{ color: colors.foreground }}
-                    >
-                      {selectedNode.level}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* AI Chat Section */}
-                <View className="px-4 py-3 flex-1">
-                  <View className="flex-row items-center gap-2 mb-2">
-                    <MaterialIcons
-                      name="psychology"
-                      size={18}
-                      color={colors.primary}
-                    />
-                    <Text
-                      className="text-xs font-bold uppercase"
-                      style={{ color: colors.mutedForeground }}
-                    >
-                      AI Assistant
-                    </Text>
-                  </View>
-
-                  {/* Chat Messages */}
-                  <ScrollView
-                    ref={chatScrollRef}
-                    className="rounded-xl border mb-3"
-                    style={{
-                      borderColor: colors.border,
-                      backgroundColor: colors.background,
-                      minHeight: 200,
-                      maxHeight: 300,
-                    }}
-                    showsVerticalScrollIndicator={false}
-                  >
-                    <View className="p-3 gap-3">
-                      {messages.length === 0 && !isStreaming ? (
-                        <Text
-                          className="text-xs text-center"
-                          style={{ color: colors.mutedForeground }}
-                        >
-                          Ask questions about this topic...
-                        </Text>
-                      ) : (
-                        messages.map((msg, idx) => (
-                          <View
-                            key={idx}
-                            className={`rounded-xl px-3 py-2 ${
-                              msg.role === "user" ? "self-end" : "self-start"
-                            }`}
-                            style={{
-                              backgroundColor:
-                                msg.role === "user"
-                                  ? colors.primary
-                                  : colors.secondary,
-                              maxWidth: "85%",
-                            }}
-                          >
-                            <Text
-                              className="text-sm leading-relaxed"
-                              style={{
-                                color:
-                                  msg.role === "user"
-                                    ? colors.primaryForeground
-                                    : colors.secondaryForeground,
-                              }}
-                            >
-                              {msg.content}
-                            </Text>
-                          </View>
-                        ))
-                      )}
-                      {isStreaming && (
-                        <View className="flex-row items-center gap-2">
-                          <ActivityIndicator
-                            size="small"
-                            color={colors.primary}
-                          />
-                          <Text
-                            className="text-xs"
-                            style={{ color: colors.mutedForeground }}
-                          >
-                            AI is thinking...
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </ScrollView>
-
-                  {/* AI Input Bar */}
-                  <View
-                    className="rounded-xl border overflow-hidden"
-                    style={{
-                      borderColor: colors.border,
-                      backgroundColor: colors.background,
-                    }}
-                  >
-                    <View className="flex-row items-center gap-2 px-3 py-2">
-                      <TextInput
-                        ref={aiInputRef}
-                        className="flex-1 text-sm"
-                        value={aiQuery}
-                        onChangeText={setAiQuery}
-                        placeholder="Ask anything about this topic..."
-                        placeholderTextColor={colors.mutedForeground}
-                        style={{ color: colors.foreground }}
-                        onSubmitEditing={handleAiQuery}
-                        returnKeyType="send"
-                        editable={!isStreaming}
-                      />
-                      <Pressable
-                        onPress={handleAiQuery}
-                        disabled={!aiQuery.trim() || isStreaming}
-                        className="w-8 h-8 rounded-full items-center justify-center"
-                        style={{
-                          backgroundColor:
-                            aiQuery.trim() && !isStreaming
-                              ? colors.primary
-                              : colors.secondary,
-                        }}
-                      >
-                        <MaterialIcons
-                          name="send"
-                          size={16}
-                          color={
-                            aiQuery.trim() && !isStreaming
-                              ? colors.primaryForeground
-                              : colors.mutedForeground
-                          }
-                        />
-                      </Pressable>
-                    </View>
-                  </View>
-                </View>
-              </ScrollView>
-            </View>
+              Ask anything...
+            </Text>
           </View>
-        </Animated.View>
-      </KeyboardAvoidingView>
-    </>
+        ) : (
+          <>
+            {messages.map((msg, i) => {
+              const isUser = msg.role === "user";
+              const textColor = isUser
+                ? colors.primaryForeground
+                : colors.foreground;
+              const baseStyle: TextStyle = {
+                fontSize: 13,
+                lineHeight: 18,
+                color: textColor,
+              };
+
+              return (
+                <View
+                  key={i}
+                  style={{
+                    alignSelf: isUser ? "flex-end" : "flex-start",
+                    maxWidth: "85%",
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: 14,
+                    backgroundColor: isUser ? colors.primary : colors.secondary,
+                  }}
+                >
+                  <Text style={baseStyle}>
+                    {isUser
+                      ? msg.content
+                      : renderMarkdown(msg.content, baseStyle, colors)}
+                  </Text>
+                </View>
+              );
+            })}
+            {isStreaming && (
+              <Text style={{ fontSize: 12, color: colors.mutedForeground }}>
+                Thinking...
+              </Text>
+            )}
+          </>
+        )}
+      </BottomSheetScrollView>
+
+      {/* Input */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          padding: 10,
+          paddingBottom: Platform.OS === "ios" ? 24 : 12,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+        }}
+      >
+        <View
+          style={{
+            flex: 1,
+            flexDirection: "row",
+            alignItems: "center",
+            backgroundColor: colors.background,
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: colors.border,
+            paddingHorizontal: 14,
+          }}
+        >
+          <BottomSheetTextInput
+            style={{
+              flex: 1,
+              fontSize: 13,
+              color: colors.foreground,
+              paddingVertical: 10,
+            }}
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Ask a question..."
+            placeholderTextColor={colors.mutedForeground}
+            onSubmitEditing={handleSend}
+            returnKeyType="send"
+            editable={!isStreaming}
+          />
+        </View>
+        <Pressable
+          onPress={handleSend}
+          disabled={!canSend}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: canSend ? colors.primary : colors.secondary,
+          }}
+        >
+          <MaterialIcons
+            name="arrow-upward"
+            size={18}
+            color={canSend ? colors.primaryForeground : colors.mutedForeground}
+          />
+        </Pressable>
+      </View>
+    </BottomSheet>
   );
 };
 

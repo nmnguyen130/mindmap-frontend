@@ -113,19 +113,6 @@ const MobileCanvas = ({
     ? (nodeMap.get(selectedNodeId) ?? null)
     : null;
 
-  // Related nodes
-  const relatedNodes = useMemo(() => {
-    if (!selectedNode) return [];
-    const ids = new Set<string>();
-    for (const edge of edges) {
-      if (edge.from === selectedNode.id) ids.add(edge.to);
-      else if (edge.to === selectedNode.id) ids.add(edge.from);
-    }
-    return Array.from(ids)
-      .map((id) => nodeMap.get(id))
-      .filter(Boolean) as MindMapNode[];
-  }, [selectedNode, nodeMap, edges]);
-
   // Colors
   const nodeColors = useMemo(
     () => ({
@@ -320,7 +307,6 @@ const MobileCanvas = ({
         <NodeSelectionPanel
           selectedNode={selectedNode}
           colors={colors}
-          relatedNodes={relatedNodes}
           documentId={documentId}
           onClose={handleClose}
         />
