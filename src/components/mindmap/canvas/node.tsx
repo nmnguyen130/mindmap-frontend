@@ -8,6 +8,7 @@ import React, { useMemo } from "react";
 import { Platform } from "react-native";
 
 import type { MindMapNode } from "@/features/mindmap";
+import { SharedValue, useDerivedValue } from "react-native-reanimated";
 
 // Node Configuration
 
@@ -34,6 +35,7 @@ interface NodeColors {
 
 interface NodeProps {
   node: MindMapNode;
+  position: { x: SharedValue<number>; y: SharedValue<number> };
   colors?: NodeColors;
   isSelected?: boolean;
 }
@@ -65,6 +67,7 @@ const fonts = {
 
 const Node = ({
   node,
+  position,
   colors = DEFAULT_COLORS,
   isSelected = false,
 }: NodeProps) => {
@@ -95,13 +98,12 @@ const Node = ({
     };
   }, [node.label, font, fontSize]);
 
-  const position = node.position ?? { x: 0, y: 0 };
   const { width, height, textWidth } = dimensions;
 
-  const x = position.x - width / 2;
-  const y = position.y - height / 2;
-  const textX = position.x - textWidth / 2;
-  const textY = position.y + fontSize / 3;
+  const x = useDerivedValue(() => position.x.value - width / 2);
+  const y = useDerivedValue(() => position.y.value - height / 2);
+  const textX = useDerivedValue(() => position.x.value - textWidth / 2);
+  const textY = useDerivedValue(() => position.y.value + fontSize / 3);
 
   return (
     <Group>

@@ -13,18 +13,22 @@ import { scheduleOnRN } from "react-native-worklets";
 
 interface GestureHandlerProps {
   children: (matrix: SharedValue<Matrix4>) => React.ReactNode;
-  /** Shared value: set to true from JS when pan should drag node instead of canvas */
   isDraggingNode: SharedValue<boolean>;
+  activeNodeId: SharedValue<string | null>;
+  nodePositions: Map<
+    string,
+    { x: SharedValue<number>; y: SharedValue<number> }
+  >;
   onTap?: (worldX: number, worldY: number) => void;
-  onDrag?: (worldX: number, worldY: number) => void;
   onDragEnd?: () => void;
 }
 
 const GestureHandler = ({
   children,
   isDraggingNode,
+  activeNodeId,
+  nodePositions,
   onTap,
-  onDrag,
   onDragEnd,
 }: GestureHandlerProps) => {
   // Canvas transform
@@ -33,6 +37,9 @@ const GestureHandler = ({
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const isPinching = useSharedValue(false);
+
+  // Drag offset (difference between tap point and node center)
+  const dragOffset = useSharedValue({ x: 0, y: 0 });
 
   // Convert screen to world
   const screenToWorld = (screenX: number, screenY: number) => {
@@ -54,17 +61,32 @@ const GestureHandler = ({
 
   // Pan gesture
   const panGesture = Gesture.Pan()
-    .onStart(() => {
+    .onStart((e) => {
       "worklet";
       savedPosition.value = position.value;
+
+      // Store offset between tap and node center
+      if (isDraggingNode.value && activeNodeId.value) {
+        const pos = nodePositions.get(activeNodeId.value);
+        if (pos) {
+          const world = screenToWorld(e.absoluteX, e.absoluteY);
+          dragOffset.value = {
+            x: pos.x.value - world.x,
+            y: pos.y.value - world.y,
+          };
+        }
+      }
     })
     .onUpdate((e) => {
       "worklet";
-      if (isPinching.value) return;
-
-      if (isDraggingNode.value) {
+      if (isDraggingNode.value && activeNodeId.value) {
         const world = screenToWorld(e.absoluteX, e.absoluteY);
-        if (onDrag) scheduleOnRN(onDrag, world.x, world.y);
+        const pos = nodePositions.get(activeNodeId.value);
+        if (pos) {
+          // Apply stored offset to keep node at same relative position
+          pos.x.value = world.x + dragOffset.value.x;
+          pos.y.value = world.y + dragOffset.value.y;
+        }
       } else {
         position.value = {
           x: savedPosition.value.x + e.translationX,

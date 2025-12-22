@@ -1,7 +1,7 @@
 import { Canvas, Group } from "@shopify/react-native-skia";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
-import { useSharedValue } from "react-native-reanimated";
+import { makeMutable, SharedValue } from "react-native-reanimated";
 
 import { useTheme } from "@/components/providers/theme-provider";
 import type { MindMapNode, MindmapData } from "@/features/mindmap";
@@ -17,9 +17,14 @@ import ViewportCulling from "./viewport-culling";
 
 // Types
 
+interface NodePosition {
+  x: SharedValue<number>;
+  y: SharedValue<number>;
+}
+
 interface MobileCanvasProps {
-  nodes: MindMapNode[];
-  edges: MindmapData["edges"];
+  nodes?: MindMapNode[];
+  edges?: MindmapData["edges"];
   mindmapId: string;
   documentId?: string;
   onNodeMove?: (nodeId: string, x: number, y: number) => void;
@@ -28,8 +33,8 @@ interface MobileCanvasProps {
 // Component
 
 const MobileCanvas = ({
-  nodes,
-  edges,
+  nodes = [],
+  edges = [],
   mindmapId,
   documentId,
   onNodeMove,
@@ -37,16 +42,40 @@ const MobileCanvas = ({
   const { colors } = useTheme();
 
   // UI State
+  const selectedNodeIdRef = useRef<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [showChatPanel, setShowChatPanel] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 
   // Drag state
-  const [dragPosition, setDragPosition] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
-  const isDraggingNode = useSharedValue(false);
+  const isDraggingNode = useRef(makeMutable(false)).current;
+  const activeNodeId = useRef(makeMutable<string | null>(null)).current;
+
+  // Shared positions
+  const positionsRef = useRef(new Map<string, NodePosition>());
+
+  // Sync positions map with nodes
+  const nodePositions = useMemo(() => {
+    const map = positionsRef.current;
+
+    // Add new nodes
+    nodes.forEach((node) => {
+      if (!map.has(node.id)) {
+        map.set(node.id, {
+          x: makeMutable(node.position?.x ?? 0),
+          y: makeMutable(node.position?.y ?? 0),
+        });
+      }
+    });
+
+    // Remove stale nodes
+    const nodeIds = new Set(nodes.map((n) => n.id));
+    for (const id of map.keys()) {
+      if (!nodeIds.has(id)) map.delete(id);
+    }
+
+    return map;
+  }, [nodes]);
 
   // Node map
   const nodeMap = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
@@ -64,7 +93,7 @@ const MobileCanvas = ({
     }
     return Array.from(ids)
       .map((id) => nodeMap.get(id))
-      .filter((n): n is MindMapNode => !!n);
+      .filter(Boolean) as MindMapNode[];
   }, [selectedNode, nodeMap, edges]);
 
   // Colors
@@ -74,7 +103,7 @@ const MobileCanvas = ({
       stroke: colors.nodeBorder,
       text: colors.nodeForeground,
     }),
-    [colors.nodeBackground, colors.nodeBorder, colors.nodeForeground]
+    [colors]
   );
   const selectedColors = useMemo(
     () => ({
@@ -82,7 +111,7 @@ const MobileCanvas = ({
       stroke: colors.primary,
       text: colors.nodeForeground,
     }),
-    [colors.nodeBackground, colors.primary, colors.nodeForeground]
+    [colors]
   );
   const connectionColor = useMemo(
     () => ({ stroke: colors.connection }),
@@ -115,33 +144,26 @@ const MobileCanvas = ({
       const node = findNodeAtPoint(x, y);
       if (node) {
         setSelectedNodeId(node.id);
+        activeNodeId.value = node.id;
+        isDraggingNode.value = true;
         setShowChatPanel(false);
-        isDraggingNode.value = true; // Enable dragging for selected node
       } else {
         setSelectedNodeId(null);
+        activeNodeId.value = null;
         isDraggingNode.value = false;
       }
     },
-    [findNodeAtPoint, isDraggingNode]
+    [findNodeAtPoint]
   );
 
-  // Drag: move selected node
-  const handleDrag = useCallback(
-    (x: number, y: number) => {
-      if (selectedNodeId) {
-        setDragPosition({ x, y });
-      }
-    },
-    [selectedNodeId]
-  );
-
-  // Drag end: persist position
+  // Persist position (JS only once)
   const handleDragEnd = useCallback(() => {
-    if (selectedNodeId && dragPosition && onNodeMove) {
-      onNodeMove(selectedNodeId, dragPosition.x, dragPosition.y);
-    }
-    setDragPosition(null);
-  }, [selectedNodeId, dragPosition, onNodeMove]);
+    const id = activeNodeId.value;
+    if (!id || !onNodeMove) return;
+    const pos = nodePositions.get(id);
+    if (!pos) return;
+    onNodeMove(id, pos.x.value, pos.y.value);
+  }, [onNodeMove, nodePositions]);
 
   // Open chat panel
   const handleOpenChat = useCallback(() => {
@@ -152,19 +174,9 @@ const MobileCanvas = ({
   const handleClose = useCallback(() => {
     setSelectedNodeId(null);
     setShowChatPanel(false);
+    activeNodeId.value = null;
     isDraggingNode.value = false;
   }, [isDraggingNode]);
-
-  // Get display position
-  const getDisplayPosition = useCallback(
-    (node: MindMapNode) => {
-      if (node.id === selectedNodeId && dragPosition) {
-        return dragPosition;
-      }
-      return node.position ?? { x: 0, y: 0 };
-    },
-    [selectedNodeId, dragPosition]
-  );
 
   // Render content
   const renderContent = useCallback(
@@ -172,20 +184,13 @@ const MobileCanvas = ({
       const visibleIds = new Set(visibleNodes.map((n) => n.id));
 
       const connections = edges
-        .filter(
-          (e) =>
-            nodeMap.has(e.from) &&
-            nodeMap.has(e.to) &&
-            (visibleIds.has(e.from) || visibleIds.has(e.to))
-        )
+        .filter((e) => visibleIds.has(e.from) || visibleIds.has(e.to))
         .map((e) => {
-          const fromNode = nodeMap.get(e.from)!;
-          const toNode = nodeMap.get(e.to)!;
           return (
             <Connection
               key={`${e.from}-${e.to}`}
-              fromNode={{ ...fromNode, position: getDisplayPosition(fromNode) }}
-              toNode={{ ...toNode, position: getDisplayPosition(toNode) }}
+              fromPosition={nodePositions.get(e.from)!}
+              toPosition={nodePositions.get(e.to)!}
               colors={connectionColor}
             />
           );
@@ -196,7 +201,8 @@ const MobileCanvas = ({
         return (
           <Node
             key={node.id}
-            node={{ ...node, position: getDisplayPosition(node) }}
+            node={node}
+            position={nodePositions.get(node.id)!}
             colors={isSelected ? selectedColors : nodeColors}
             isSelected={isSelected}
           />
@@ -210,32 +216,20 @@ const MobileCanvas = ({
         </>
       );
     },
-    [
-      edges,
-      nodeMap,
-      connectionColor,
-      selectedNodeId,
-      selectedColors,
-      nodeColors,
-      getDisplayPosition,
-    ]
+    [edges, nodeMap, nodePositions, selectedNodeId, nodeColors, selectedColors]
   );
 
   return (
     <View
       className="flex-1"
       style={{ backgroundColor: colors.background }}
-      onLayout={(e) =>
-        setCanvasSize({
-          width: e.nativeEvent.layout.width,
-          height: e.nativeEvent.layout.height,
-        })
-      }
+      onLayout={(e) => setCanvasSize(e.nativeEvent.layout)}
     >
       <GestureHandler
         isDraggingNode={isDraggingNode}
+        activeNodeId={activeNodeId}
+        nodePositions={nodePositions}
         onTap={handleTap}
-        onDrag={handleDrag}
         onDragEnd={handleDragEnd}
       >
         {(matrix) => (
